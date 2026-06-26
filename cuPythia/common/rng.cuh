@@ -1,6 +1,13 @@
 #pragma once
 #include <cstdint>
 
+// Portability: MSVC's <cmath> does not define M_PI unless _USE_MATH_DEFINES was
+// set before <cmath> was included. Provide a fallback so every kernel builds
+// identically on Windows (MSVC) and Linux (glibc). All kernels include this header.
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 // Host/device-identical SplitMix64 counter-based RNG (no cuRAND dependency).
 // Counter-based so each GPU thread derives an independent stream from (seed,tid)
 // with no per-thread state to store, and CPU/GPU produce bit-identical draws —

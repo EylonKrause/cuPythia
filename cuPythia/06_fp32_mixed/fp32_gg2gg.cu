@@ -79,7 +79,7 @@ static int runPrec(uint64_t seed, uint64_t kPer, int blocks, int threads,
 int main(int argc, char** argv) {
   uint64_t kPer = (argc > 1) ? strtoull(argv[1], nullptr, 10) : 4000ULL;
   const int blocks = 1024, threads = 256;
-  double s = 100.0 * 100.0, alphaS = 0.118, cMax = 0.9, seedS = 0;
+  double s = 100.0 * 100.0, alphaS = 0.118, cMax = 0.9;
   uint64_t seed = 0xABCDEF01ULL;
 
   double sigD, msD, sigF, msF;
@@ -88,7 +88,6 @@ int main(int argc, char** argv) {
   double ref = simpson(2000000, s, alphaS, cMax) * 0.3893793721;
   uint64_t total = (uint64_t)blocks * threads * kPer;
   double relD = fabs(sigD - ref) / ref, relF = fabs(sigF - ref) / ref;
-  (void)seedS;
 
   printf("FP32 vs FP64 fused g g -> g g  (%.3e trials, sHat=(100 GeV)^2)\n", (double)total);
   printf("  Simpson reference = %.6e mb\n", ref);

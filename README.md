@@ -45,10 +45,14 @@ GPU-resident); 04 scales MC across a cluster (near-linear — the one place that
 
 ## What this adds beyond stock Pythia
 
-See `HEP_FEATURES.md` — capabilities the HL-LHC / generators-on-accelerators
-community wants that stock Pythia lacks: GPU-accelerated ME/MC, cluster scaling,
-and **counter-based per-event reproducible RNG** (regenerate any single event
-independently on any node — useful for GRID production and debugging).
+See `HEP_FEATURES.md` and `RESEARCH_DIRECTIONS.md` — capabilities the HL-LHC /
+generators-on-accelerators community wants that stock Pythia lacks: GPU-accelerated
+ME/MC, cluster scaling, counter-based per-event reproducible RNG, GPU unweighting +
+Les Houches I/O, and the full QCD 2→2 process set on GPU.
+
+**Native Windows 11 support** (`BUILD_WINDOWS.md`) — stock Pythia has no native
+Windows build (Unix `configure`); the cuPythia kernels build and run natively on
+Windows (MSVC + CUDA + CMake), identical to Linux. One command: `build.ps1`.
 
 ## Audit
 
@@ -61,8 +65,10 @@ upstream-PR candidates.
 
 ```
 pythia8317/      vendored Pythia 8.317 (build artifacts gitignored)
-cuPythia/        GPU kernels 00..05 + common/rng.cuh + Makefile
+cuPythia/        GPU kernels 00..08 + common/rng.cuh + Makefile + CMakeLists.txt + build.ps1
 AUDIT.md         verified Pythia findings
+HEP_FEATURES.md / RESEARCH_DIRECTIONS.md   community-needs map (cited)
+BUILD_WINDOWS.md native Windows 11 build
 HEP_FEATURES.md  gap analysis vs community needs
 ```
 

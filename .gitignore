@@ -15,8 +15,13 @@ pythia8317/examples/hepmcout*
 # Source tarball (re-downloadable from pythia.org)
 *.tgz
 
-# cuPythia GPU build outputs
+# cuPythia GPU build outputs (Linux + Windows/CMake)
 build/
+build-win/
+*.exe
+*.obj
+*.pdb
+*.exp
 cuPythia/**/*.out
 cuPythia/**/bench_*
 cuPythia/**/mc_pi
