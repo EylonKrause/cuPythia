@@ -18,6 +18,9 @@ counter-based, so any single event is **O(1)-reproducible** on any node.
 - [x] **stage 2 — `reweight.cu`**: N scale-variation weights per event in one pass,
   **bit-identical (max|diff|=0) to N independent pinned re-runs** (the counter-RNG
   advantage); physical ±25% LO scale band. μ_F/PDF variations await stage 1.
+- [x] **orchestrator — `generate.cu`**: the device-resident parton-level generator —
+  build → reweight → unweight → CUB-compact, **all on one record, no host round-trip**
+  (the gap Pepper/madgraph4gpu concede). σ vs quadrature, scale band, CUB count exact.
 - [ ] stage 3 — physical parton shower (recoil + colour + variable P(z)) into the record
 - [ ] stage 4 — hadronization on device (feasibility-gated) + decays
 - [ ] stage 5 — standard I/O (spec-valid LHE / HepMC3 / Rivet smoke test)
