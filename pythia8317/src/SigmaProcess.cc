@@ -1168,7 +1168,7 @@ void Sigma3Process::store3Kin( double x1in, double x2in, double sHin,
 
     // Different options for factorization scale, but normally sHat.
     Q2FacSave = factorMultFac * sH;
-    if (factorScale1 == 2) Q2RenSave = factorFixScale;
+    if (factorScale1 == 2) Q2FacSave = factorFixScale;
 
   // "Normal" 2 -> 3 processes, i.e. not vector boson fusion.
   } else if ( idTchan1() != 23 && idTchan1() != 24 && idTchan2() != 23

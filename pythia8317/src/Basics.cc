@@ -107,7 +107,7 @@ int Rndm::pick(const vector<double>& prob) {
   work *= flat();
   int index = -1;
   do work -= prob[++index];
-  while (work > 0. && index < int(prob.size()));
+  while (work > 0. && index < int(prob.size()) - 1);
   return index;
 
 }
