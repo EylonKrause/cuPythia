@@ -21,6 +21,7 @@ cupy/**/*.out
 cupy/**/bench_*
 cupy/**/mc_pi
 cupy/**/xsec
+cupy/**/qcd_2to2
 cupy/**/err*.log
 
 # Scratch / logs
