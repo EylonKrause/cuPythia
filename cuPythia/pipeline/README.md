@@ -15,7 +15,9 @@ counter-based, so any single event is **O(1)-reproducible** on any node.
   record on-GPU. Validated: exact 4-momentum conservation (**0 imbalance**), record
   integrity (all events well-formed), cross-section sanity vs quadrature.
 - [ ] stage 1 — PDF convolution + process selection (a real hadronic σ, not partonic)
-- [ ] stage 2 — multi-weight systematic reweighting (scale/αs/PDF, one resident pass)
+- [x] **stage 2 — `reweight.cu`**: N scale-variation weights per event in one pass,
+  **bit-identical (max|diff|=0) to N independent pinned re-runs** (the counter-RNG
+  advantage); physical ±25% LO scale band. μ_F/PDF variations await stage 1.
 - [ ] stage 3 — physical parton shower (recoil + colour + variable P(z)) into the record
 - [ ] stage 4 — hadronization on device (feasibility-gated) + decays
 - [ ] stage 5 — standard I/O (spec-valid LHE / HepMC3 / Rivet smoke test)
