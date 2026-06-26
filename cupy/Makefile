@@ -5,7 +5,8 @@ NVCC      ?= /usr/local/cuda/bin/nvcc
 ARCH      ?= sm_120
 NVCCFLAGS ?= -O3 -arch=$(ARCH)
 
-BINS = 00_toolchain_check/mc_pi 01_xsec_ee_mumu/xsec 02_qcd_2to2_me/qcd_2to2
+BINS = 00_toolchain_check/mc_pi 01_xsec_ee_mumu/xsec 02_qcd_2to2_me/qcd_2to2 \
+       03_fused_resident_me/fused_gg2gg
 
 all: $(BINS)
 
@@ -18,11 +19,15 @@ all: $(BINS)
 02_qcd_2to2_me/qcd_2to2: 02_qcd_2to2_me/qcd_2to2.cu common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
 
+03_fused_resident_me/fused_gg2gg: 03_fused_resident_me/fused_gg2gg.cu common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -o $@ $<
+
 # Build everything and run each kernel's self-validation.
 check: all
 	./00_toolchain_check/mc_pi
 	./01_xsec_ee_mumu/xsec 10.0
 	./02_qcd_2to2_me/qcd_2to2 2000000
+	./03_fused_resident_me/fused_gg2gg 1000
 
 clean:
 	rm -f $(BINS)
