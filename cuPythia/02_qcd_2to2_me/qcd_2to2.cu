@@ -59,7 +59,7 @@ __global__ void meKernel(const double* sH, const double* tH, const double* uH,
 
 #define CK(call) do { cudaError_t e_=(call); if(e_!=cudaSuccess){ \
   printf("CUDA error %s at %s:%d\n", cudaGetErrorString(e_), __FILE__, __LINE__); return 1; } } while(0)
-using Clock = std::chrono::high_resolution_clock;
+using Clock = std::chrono::steady_clock;
 static double ms(Clock::time_point a, Clock::time_point b) {
   return std::chrono::duration<double, std::milli>(b - a).count();
 }

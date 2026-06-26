@@ -65,19 +65,19 @@ int main(int argc, char** argv) {
   CK(cudaDeviceSynchronize());
 
   CK(cudaMemset(dSum, 0, sizeof(double)));
-  auto t0 = std::chrono::high_resolution_clock::now();
+  auto t0 = std::chrono::steady_clock::now();
   xsecKernel<<<blocks, threads>>>(seed, perThread, pref, dSum);
   CK(cudaDeviceSynchronize());
-  auto t1 = std::chrono::high_resolution_clock::now();
+  auto t1 = std::chrono::steady_clock::now();
 
   double hSum = 0.0; CK(cudaMemcpy(&hSum, dSum, sizeof(double), cudaMemcpyDeviceToHost));
   double sigmaGpu_nb = 4.0 * M_PI * (hSum / (double)totalGpu) * GeVm2_nb;
   double gpuMs = std::chrono::duration<double, std::milli>(t1 - t0).count();
 
   uint64_t totalCpu = totalGpu < 200000000ULL ? totalGpu : 200000000ULL;
-  auto c0 = std::chrono::high_resolution_clock::now();
+  auto c0 = std::chrono::steady_clock::now();
   double cSum = cpuSum(seed, totalCpu, pref);
-  auto c1 = std::chrono::high_resolution_clock::now();
+  auto c1 = std::chrono::steady_clock::now();
   double sigmaCpu_nb = 4.0 * M_PI * (cSum / (double)totalCpu) * GeVm2_nb;
   double cpuMs = std::chrono::duration<double, std::milli>(c1 - c0).count();
 

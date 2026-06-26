@@ -64,10 +64,10 @@ int main(int argc, char** argv) {
   CK(cudaDeviceSynchronize());
 
   CK(cudaMemset(dInside, 0, sizeof(unsigned long long)));
-  auto t0 = std::chrono::high_resolution_clock::now();
+  auto t0 = std::chrono::steady_clock::now();
   mcPiKernel<<<blocks, threads>>>(seed, perThread, dInside);
   CK(cudaDeviceSynchronize());
-  auto t1 = std::chrono::high_resolution_clock::now();
+  auto t1 = std::chrono::steady_clock::now();
 
   unsigned long long hInside = 0;
   CK(cudaMemcpy(&hInside, dInside, sizeof(unsigned long long), cudaMemcpyDeviceToHost));
@@ -76,9 +76,9 @@ int main(int argc, char** argv) {
 
   // CPU baseline (cap so it stays a few hundred ms; rates are the fair metric).
   uint64_t totalCpu = totalGpu < 200000000ULL ? totalGpu : 200000000ULL;
-  auto c0 = std::chrono::high_resolution_clock::now();
+  auto c0 = std::chrono::steady_clock::now();
   double piCpu = cpuPi(seed, totalCpu);
-  auto c1 = std::chrono::high_resolution_clock::now();
+  auto c1 = std::chrono::steady_clock::now();
   double cpuMs = std::chrono::duration<double, std::milli>(c1 - c0).count();
 
   double gpuRate = totalGpu / (gpuMs / 1000.0);
