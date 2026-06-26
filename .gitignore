@@ -39,6 +39,8 @@ cuPythia/**/vegas
 cuPythia/**/phase_space
 cuPythia/**/rescatter
 cuPythia/**/shower
+cuPythia/pipeline/build_events
+cuPythia/pipeline/**/gen
 cuPythia/**/*.lhe
 cuPythia/**/err*.log
 
