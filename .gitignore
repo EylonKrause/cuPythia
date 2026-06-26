@@ -23,6 +23,8 @@ cuPythia/**/mc_pi
 cuPythia/**/xsec
 cuPythia/**/qcd_2to2
 cuPythia/**/fused_gg2gg
+cuPythia/**/multi_gpu_gg2gg
+cuPythia/**/repro_events
 cuPythia/**/err*.log
 
 # Scratch / logs

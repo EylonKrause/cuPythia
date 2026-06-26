@@ -2,15 +2,15 @@
 
 GPU-acceleration experiments on top of [Pythia 8](https://pythia.org), the
 Monte-Carlo event generator. The name is short for **cu**da **Pythia**.
-(Renamed from "cuPy" to avoid confusion with the unrelated
-[CuPy](https://cupy.dev) NumPy-on-GPU array library.)
+(Not affiliated with the [CuPy](https://cupy.dev) GPU array library.)
 
 ## What this is
 
 1. Vendors an unmodified copy of **Pythia 8.317** (`pythia8317/`) as the baseline.
 2. Studies which parts of event generation are genuinely data-parallel (`AUDIT.md`).
 3. Implements those parts as CUDA kernels under `cuPythia/`, each **validated**
-   against a CPU/analytic result and **benchmarked** on an RTX 5050.
+   against a CPU/analytic result, **benchmarked** on an RTX 5050, and scalable
+   across **multiple GPUs and nodes**.
 
 ## Honest scope (read first)
 
@@ -20,7 +20,9 @@ physically possible** — Amdahl's law bounds the end-to-end gain. What *is* rea
 
 - **10–100×** on individual data-parallel kernels in isolation;
 - a meaningful **end-to-end factor** by batching across *events* and keeping data
-  **GPU-resident** (avoiding PCIe traffic).
+  **GPU-resident** (avoiding PCIe traffic);
+- **near-linear** scaling of Monte-Carlo generation across a **cluster of GPUs**
+  (independent RNG substreams + one reduction).
 
 Every speedup here ships with a reproducible benchmark and a correctness check.
 
@@ -32,9 +34,17 @@ Every speedup here ships with a reproducible benchmark and a correctness check.
 | 01 | σ(e⁺e⁻→μ⁺μ⁻) | 4πα²/3s | ~17.7× |
 | 02 | QCD gg→gg ME (Pythia `Sigma2gg2gg`) | CPU port + textbook | 4.5× kern / 1.3× e2e |
 | 03 | fused resident gg→gg MC | Simpson quadrature | ~6.8× |
+| 04 | multi-GPU / multi-node MC | exact grid coverage + quadrature | ~N× per GPU |
 
-See `cuPythia/README.md`. The 02→03 jump (1.3×→6.8×) is the project's core lesson:
-keep data GPU-resident; the remaining ceiling is consumer-GPU FP64 throughput.
+See `cuPythia/README.md`. The 02→03 jump (1.3×→6.8×) is the core lesson (keep data
+GPU-resident); 04 scales MC across a cluster (near-linear — the one place that holds).
+
+## What this adds beyond stock Pythia
+
+See `HEP_FEATURES.md` — capabilities the HL-LHC / generators-on-accelerators
+community wants that stock Pythia lacks: GPU-accelerated ME/MC, cluster scaling,
+and **counter-based per-event reproducible RNG** (regenerate any single event
+independently on any node — useful for GRID production and debugging).
 
 ## Audit
 
@@ -47,8 +57,9 @@ upstream-PR candidates.
 
 ```
 pythia8317/      vendored Pythia 8.317 (build artifacts gitignored)
-cuPythia/        GPU kernels + benchmarks (00..03, common/rng.cuh, Makefile)
+cuPythia/        GPU kernels 00..05 + common/rng.cuh + Makefile
 AUDIT.md         verified Pythia findings
+HEP_FEATURES.md  gap analysis vs community needs
 ```
 
 ## Build
@@ -56,4 +67,5 @@ AUDIT.md         verified Pythia findings
 ```bash
 cd pythia8317 && ./configure && make -j"$(nproc)"   # baseline library
 cd ../cuPythia && make check                         # build + validate all kernels
+cd ../cuPythia && make mpi                            # optional: multi-node build (needs mpicxx)
 ```

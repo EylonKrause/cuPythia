@@ -11,27 +11,36 @@ end-to-end, **not** whole-generator claims.
 | 01 | σ(e⁺e⁻→μ⁺μ⁻) | 4πα²/3s (closed form) | 0.868544 nb, relerr 8.5e-7 — PASS | ~17.7× |
 | 02 | QCD gg→gg ME (Pythia `Sigma2gg2gg`) | CPU port + textbook analytic | relerr 3e-16 / 8e-16 — PASS | 4.5× kern / **1.3× e2e** |
 | 03 | Fused resident gg→gg MC | Simpson quadrature | relerr 3.7e-5 — PASS | **6.8×** |
+| 04 | Multi-GPU / multi-node MC | exact grid coverage + Simpson | identical σ @ 1/4/16 shards — PASS | **~N× per GPU** |
+| 05 | Reproducible per-event RNG | out-of-order regen + node partition | max\|diff\|=0 — PASS | (reproducibility, not speed) |
 
 \* throughput vs 1 CPU thread. 00/01 do many trials per thread in registers
 (compute-bound → big speedup); 02 transfers SoA arrays + 1 eval/thread
-(transfer/FP64-bound → small e2e speedup); 03 fuses generation+ME on-device,
-recovering 1.3×→6.8× (now FP64-division-bound, not transfer-bound). The central
-lesson: **keep data GPU-resident; fuse stages; mind FP64 on consumer GPUs.**
+(transfer/FP64-bound → small e2e); 03 fuses generation+ME on-device, recovering
+1.3×→6.8× (now FP64-division-bound); 04 shards the MC across GPUs/nodes
+(embarrassingly parallel → near-linear, the one place a cluster scales).
 
 Shared: `common/rng.cuh` — host/device-identical SplitMix64 (counter-based, no
-cuRAND), which is what makes the exact GPU-vs-CPU validation possible.
+cuRAND), which is what makes the exact GPU-vs-CPU validation and independent
+per-shard substreams possible.
 
 ## Build / validate
 ```bash
 make            # build all kernels   (override ARCH=... / NVCC=...)
 make check      # build + run every kernel's self-validation
+make mpi        # optional multi-node build of kernel 04 (needs mpicxx)
 ```
 
-## Roadmap (sequenced by GPU-friendliness)
-- [x] 00 — toolchain + RNG harness (MC π)
-- [x] 01 — matrix-element MC (fixed-angle σ)
-- [ ] 02 — 2→2 phase-space generation (full final-state kinematics)
-- [ ] 03 — O(N²) hadronic rescattering (all-pairs, heavy-ion)
-- [ ] 04 — batched-across-events parton shower (the hard one)
+## Roadmap
+- [x] 00 — toolchain + counter-based RNG harness (MC π)
+- [x] 01 — matrix-element MC (e⁺e⁻→μ⁺μ⁻ vs closed form)
+- [x] 02 — batched QCD 2→2 ME (the transfer-bound lesson)
+- [x] 03 — fused resident ME (the resident win; FP64 ceiling)
+- [x] 04 — multi-GPU / multi-node scaling (cluster)
+- [x] 05 — counter-based per-event reproducible RNG (GRID production / debugging)
+- [ ] FP32 / mixed-precision variant (break the consumer-GPU FP64 ceiling)
+- [ ] full 2→2 phase-space generation (final-state kinematics)
+- [ ] O(N²) hadronic rescattering (all-pairs, heavy-ion)
+- [ ] batched-across-events parton shower (the hard one)
 
-Targets/ordering are refined by the subsystem study of Pythia 8.317.
+Targets/ordering are refined by the Pythia 8.317 subsystem study (`../AUDIT.md`).
