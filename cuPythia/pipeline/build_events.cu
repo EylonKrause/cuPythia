@@ -37,8 +37,9 @@ __global__ void buildKernel(DeviceEvents ev, double sqrtS, double alpS, double c
   addParticle(ev,e,  p3x, p3y, p3z, E, 0, 21,23, 503,504, 0,1);
   addParticle(ev,e, -p3x,-p3y,-p3z, E, 0, 21,23, 504,502, 0,1);
   double t = -0.5*s*(1.0-cosT);
-  ev.weight[e] = gg2gg_sigma(s, t, -s - t, alpS);   // event weight = dσ/dt̂
-  ev.scale[e]  = E*st;                               // pT-hat (hard scale)
+  ev.x1[e]=1.0; ev.x2[e]=1.0; ev.flavA[e]=21; ev.flavB[e]=21; // partonic gg at fixed sHat
+  ev.weight[(size_t)e*ev.nVar+0] = gg2gg_sigma(s, t, -s - t, alpS); // nominal weight = dσ/dt̂
+  ev.scale[e]  = E*st;                                // pT-hat (hard scale)
 }
 
 #define CK(call) do{ cudaError_t e_=(call); if(e_!=cudaSuccess){ \
