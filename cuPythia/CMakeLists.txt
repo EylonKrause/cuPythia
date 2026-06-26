@@ -38,7 +38,9 @@ set(CUPYTHIA_KERNELS
   06_fp32_mixed/fp32_gg2gg.cu
   07_unweighting_lhe/unweight_lhe.cu
   08_qcd_process_library/qcd_library.cu
-  09_neutrino_dis/nu_dis.cu)
+  09_neutrino_dis/nu_dis.cu
+  10_cub_compaction/cub_compaction.cu
+  11_vegas_importance/vegas.cu)
 
 foreach(src ${CUPYTHIA_KERNELS})
   get_filename_component(name ${src} NAME_WE)

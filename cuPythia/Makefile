@@ -10,7 +10,8 @@ BINS = 00_toolchain_check/mc_pi 01_xsec_ee_mumu/xsec 02_qcd_2to2_me/qcd_2to2 \
        03_fused_resident_me/fused_gg2gg 04_multi_gpu/multi_gpu_gg2gg \
        05_reproducible_events/repro_events 06_fp32_mixed/fp32_gg2gg \
        07_unweighting_lhe/unweight_lhe 08_qcd_process_library/qcd_library \
-       09_neutrino_dis/nu_dis
+       09_neutrino_dis/nu_dis 10_cub_compaction/cub_compaction \
+       11_vegas_importance/vegas
 
 all: $(BINS)
 
@@ -44,6 +45,12 @@ all: $(BINS)
 09_neutrino_dis/nu_dis: 09_neutrino_dis/nu_dis.cu common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
 
+10_cub_compaction/cub_compaction: 10_cub_compaction/cub_compaction.cu common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -o $@ $<
+
+11_vegas_importance/vegas: 11_vegas_importance/vegas.cu common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -o $@ $<
+
 # Build everything and run each kernel's self-validation.
 check: all
 	./00_toolchain_check/mc_pi
@@ -56,6 +63,8 @@ check: all
 	cd 07_unweighting_lhe && ./unweight_lhe 1000
 	./08_qcd_process_library/qcd_library 2000
 	./09_neutrino_dis/nu_dis 2000
+	./10_cub_compaction/cub_compaction 4000000
+	./11_vegas_importance/vegas 1000
 
 # Multi-node build (needs mpicxx in PATH); not part of `all` / `check`.
 mpi:

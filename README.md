@@ -40,6 +40,8 @@ Every speedup here ships with a reproducible benchmark and a correctness check.
 | 07 | unweighting efficiency + LHE output | η==⟨w⟩/w_max + σ vs Simpson | η=10% (gg→gg) + standard I/O |
 | 08 | QCD 2→2 process library | 5 processes, Pythia vs textbook | all PASS <1e-12 |
 | 09 | neutrino DIS (parton model) | flat vs (1−y)², ratio=3 | EW/ν sector |
+| 10 | CUB on-GPU event compaction | CUB count == atomic count | scalable I/O |
+| 11 | VEGAS importance sampling | η 10%→76% + integral | **7.6× efficiency** |
 
 See `cuPythia/README.md`. The 02→03 jump (1.3×→6.8×) is the core lesson (keep data
 GPU-resident); 04 scales MC across a cluster (near-linear — the one place that holds).
