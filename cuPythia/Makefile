@@ -7,7 +7,7 @@ NVCCFLAGS ?= -O3 -arch=$(ARCH)
 
 BINS = 00_toolchain_check/mc_pi 01_xsec_ee_mumu/xsec 02_qcd_2to2_me/qcd_2to2 \
        03_fused_resident_me/fused_gg2gg 04_multi_gpu/multi_gpu_gg2gg \
-       05_reproducible_events/repro_events
+       05_reproducible_events/repro_events 06_fp32_mixed/fp32_gg2gg
 
 all: $(BINS)
 
@@ -29,6 +29,9 @@ all: $(BINS)
 05_reproducible_events/repro_events: 05_reproducible_events/repro_events.cu common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
 
+06_fp32_mixed/fp32_gg2gg: 06_fp32_mixed/fp32_gg2gg.cu common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -o $@ $<
+
 # Build everything and run each kernel's self-validation.
 check: all
 	./00_toolchain_check/mc_pi
@@ -37,6 +40,7 @@ check: all
 	./03_fused_resident_me/fused_gg2gg 1000
 	./04_multi_gpu/multi_gpu_gg2gg 1000 --shards 4
 	./05_reproducible_events/repro_events 1000000
+	./06_fp32_mixed/fp32_gg2gg 2000
 
 # Multi-node build (needs mpicxx in PATH); not part of `all` / `check`.
 mpi:

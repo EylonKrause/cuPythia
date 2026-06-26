@@ -35,6 +35,8 @@ Every speedup here ships with a reproducible benchmark and a correctness check.
 | 02 | QCD gg→gg ME (Pythia `Sigma2gg2gg`) | CPU port + textbook | 4.5× kern / 1.3× e2e |
 | 03 | fused resident gg→gg MC | Simpson quadrature | ~6.8× |
 | 04 | multi-GPU / multi-node MC | exact grid coverage + quadrature | ~N× per GPU |
+| 05 | reproducible per-event RNG | out-of-order regen + node partition | bit-identical |
+| 06 | FP32 / mixed precision | FP64 + Simpson | **30× over FP64**, same accuracy |
 
 See `cuPythia/README.md`. The 02→03 jump (1.3×→6.8×) is the core lesson (keep data
 GPU-resident); 04 scales MC across a cluster (near-linear — the one place that holds).

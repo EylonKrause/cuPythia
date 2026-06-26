@@ -13,6 +13,7 @@ end-to-end, **not** whole-generator claims.
 | 03 | Fused resident gg→gg MC | Simpson quadrature | relerr 3.7e-5 — PASS | **6.8×** |
 | 04 | Multi-GPU / multi-node MC | exact grid coverage + Simpson | identical σ @ 1/4/16 shards — PASS | **~N× per GPU** |
 | 05 | Reproducible per-event RNG | out-of-order regen + node partition | max\|diff\|=0 — PASS | (reproducibility, not speed) |
+| 06 | FP32 / mixed precision | FP64 + Simpson (same samples) | relerr 4e-5 — PASS | **30× over FP64** |
 
 \* throughput vs 1 CPU thread. 00/01 do many trials per thread in registers
 (compute-bound → big speedup); 02 transfers SoA arrays + 1 eval/thread
@@ -38,7 +39,7 @@ make mpi        # optional multi-node build of kernel 04 (needs mpicxx)
 - [x] 03 — fused resident ME (the resident win; FP64 ceiling)
 - [x] 04 — multi-GPU / multi-node scaling (cluster)
 - [x] 05 — counter-based per-event reproducible RNG (GRID production / debugging)
-- [ ] FP32 / mixed-precision variant (break the consumer-GPU FP64 ceiling)
+- [x] 06 — FP32 / mixed precision (30× over FP64 at the same MC accuracy)
 - [ ] full 2→2 phase-space generation (final-state kinematics)
 - [ ] O(N²) hadronic rescattering (all-pairs, heavy-ion)
 - [ ] batched-across-events parton shower (the hard one)

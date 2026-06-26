@@ -25,6 +25,7 @@ cuPythia/**/qcd_2to2
 cuPythia/**/fused_gg2gg
 cuPythia/**/multi_gpu_gg2gg
 cuPythia/**/repro_events
+cuPythia/**/fp32_gg2gg
 cuPythia/**/err*.log
 
 # Scratch / logs
