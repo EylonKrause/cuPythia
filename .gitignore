@@ -19,6 +19,8 @@ pythia8317/examples/hepmcout*
 build/
 cupy/**/*.out
 cupy/**/bench_*
+cupy/**/mc_pi
+cupy/**/err*.log
 
 # Scratch / logs
 *.log
