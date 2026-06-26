@@ -20,6 +20,7 @@ build/
 cupy/**/*.out
 cupy/**/bench_*
 cupy/**/mc_pi
+cupy/**/xsec
 cupy/**/err*.log
 
 # Scratch / logs
