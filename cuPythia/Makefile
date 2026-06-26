@@ -4,7 +4,7 @@
 # Cross-platform CMake build (Windows + Linux) lives in CMakeLists.txt.
 NVCC      ?= /usr/local/cuda/bin/nvcc
 ARCH      ?= sm_120
-NVCCFLAGS ?= -O3 -arch=$(ARCH)
+NVCCFLAGS ?= -O3 -std=c++17 -arch=$(ARCH)
 
 BINS = 00_toolchain_check/mc_pi 01_xsec_ee_mumu/xsec 02_qcd_2to2_me/qcd_2to2 \
        03_fused_resident_me/fused_gg2gg 04_multi_gpu/multi_gpu_gg2gg \
