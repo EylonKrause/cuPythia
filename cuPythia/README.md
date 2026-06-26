@@ -15,6 +15,7 @@ end-to-end, **not** whole-generator claims.
 | 05 | Reproducible per-event RNG | out-of-order regen + node partition | max\|diff\|=0 — PASS | (reproducibility, not speed) |
 | 06 | FP32 / mixed precision | FP64 + Simpson (same samples) | relerr 4e-5 — PASS | **30× over FP64** |
 | 07 | Unweighting + LHE output | η==⟨w⟩/w_max + σ vs Simpson | η=10%, relerr 3.5e-5 — PASS | (production metric + I/O) |
+| 08 | QCD 2→2 process library | Pythia verbatim vs textbook (5 processes) | all PASS <1e-12 | (physics coverage) |
 
 \* throughput vs 1 CPU thread. 00/01 do many trials per thread in registers
 (compute-bound → big speedup); 02 transfers SoA arrays + 1 eval/thread
@@ -42,6 +43,7 @@ make mpi        # optional multi-node build of kernel 04 (needs mpicxx)
 - [x] 05 — counter-based per-event reproducible RNG (GRID production / debugging)
 - [x] 06 — FP32 / mixed precision (30× over FP64 at the same MC accuracy)
 - [x] 07 — GPU unweighting efficiency + Les Houches (.lhe) output
+- [x] 08 — QCD 2→2 process library (gg→gg, qg→qg, qq'→qq', qqbar→gg, gg→qqbar)
 - [ ] VEGAS / adaptive importance sampling (raise unweighting efficiency)
 - [ ] full 2→2 phase-space generation (final-state kinematics)
 - [ ] O(N²) hadronic rescattering (all-pairs, heavy-ion)

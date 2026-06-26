@@ -27,6 +27,7 @@ cuPythia/**/multi_gpu_gg2gg
 cuPythia/**/repro_events
 cuPythia/**/fp32_gg2gg
 cuPythia/**/unweight_lhe
+cuPythia/**/qcd_library
 cuPythia/**/*.lhe
 cuPythia/**/err*.log
 
