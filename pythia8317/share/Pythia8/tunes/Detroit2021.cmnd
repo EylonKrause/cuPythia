@@ -1,0 +1,42 @@
+! The Detroit tune.
+! See M. Aguilar et al., Phys. Rev. D105 (2022) 1, 016011 [arXiv:2110.09447].
+include                              = tunes/Reset-pp.cmnd      ! reset pp tune
+include                              = tunes/Monash2013-ee.cmnd ! set ee tune
+! Detroit tune parameters.
+PDF:pSet                             = 17       ! NNPDF 3.1 LO aS_0130
+MultipartonInteractions:pT0Ref       = 1.40  
+MultipartonInteractions:ecmRef       = 200. 
+MultipartonInteractions:ecmPow       = 0.135 
+MultipartonInteractions:bProfile     = 2   
+MultipartonInteractions:coreRadius   = 0.56 
+MultipartonInteractions:coreFraction = 0.78
+ColourReconnection:mode              = 0     
+ColourReconnection:range             = 5.4  
+! Settings carried over from the Monash 2013 tune. 
+SigmaProcess:alphaSvalue            = 0.130    ! same as PDF
+SigmaTotal:zeroAXB                  = true  
+SigmaDiffractive:dampen             = true  
+SigmaDiffractive:maxXB              = 65.0  
+SigmaDiffractive:maxAX              = 65.0  
+SigmaDiffractive:maxXX              = 65.0  
+Diffraction:largeMassSuppress       = 4.0   
+TimeShower:dampenBeamRecoil         = true  
+TimeShower:phiPolAsym               = true  
+SpaceShower:alphaSvalue             = 0.1365   ! same as FSR
+SpaceShower:alphaSorder             = 1     
+SpaceShower:alphaSuseCMW            = false 
+SpaceShower:samePTasMPI             = false 
+SpaceShower:pT0Ref                  = 2.0   
+SpaceShower:ecmRef                  = 7000.0
+SpaceShower:ecmPow                  = 0.0   
+SpaceShower:pTmaxFudge              = 1.0   
+SpaceShower:pTdampFudge             = 1.0   
+SpaceShower:rapidityOrder           = true  
+SpaceShower:rapidityOrderMPI        = true  
+SpaceShower:phiPolAsym              = true  
+SpaceShower:phiIntAsym              = true  
+MultipartonInteractions:alphaSvalue = 0.130    ! same as PDF
+BeamRemnants:primordialKTsoft       = 0.9   
+BeamRemnants:primordialKThard       = 1.8   
+BeamRemnants:halfScaleForKT         = 1.5   
+BeamRemnants:halfMassForKT          = 1.0   

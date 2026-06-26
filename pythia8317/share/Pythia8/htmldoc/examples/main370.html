@@ -1,0 +1,228 @@
+<html><head><title>main370</title>
+<link rel="stylesheet" type="text/css" href="../pythia.css"/>
+<link rel="shortcut icon" href="../pythia32.gif"/></head><body><h2>main370</h2>
+Back to <a href="../ExampleKeywords.html" target="page">index.</a>
+<pre><code class="language-c++">
+// main370.cc is a part of the PYTHIA event generator.
+// Copyright (C) 2026 Torbjorn Sjostrand.
+// PYTHIA is licenced under the GNU GPL v2 or later, see COPYING for details.
+// Please respect the MCnet Guidelines, see GUIDELINES for details.
+
+// Authors:
+//            <a href="mailto:torbjorn.sjostrand@fysik.lu.se">Torbjorn Sjostrand</a>
+
+// Keywords:
+//            <a href="../ExampleKeywords.html#top">Top</a>
+//            <a href="../ExampleKeywords.html#toponium">Toponium</a>
+//            <a href="../ExampleKeywords.html#openmp">Openmp</a>
+
+// Plot ttbar system properties contrasting five different scenarios:
+// 0 : pure Born baseline.
+// 1 : Coulomb enhancement.
+// 2 : Green&apos;s function, full top width in Breit-Wigner and matrix element.
+// 3 :  Green&apos;s function, reduced top width in Breit-Wigner.
+// 4 :  Green&apos;s function, reduced top width in matrix elements.
+// Plots all scenarios in one frame, which may be too much.
+
+// This main is the same as main369, but demonstrates how the run
+// can be done with PythiaParallel rather than OpenMP.
+
+// Based on threshold factors according to
+// V. Fadin,  V. Khoze and T. Sjostrand, Z. Phys. C48 (1990) 613.
+
+#include &quot;Pythia8/PythiaParallel.h&quot;
+using namespace Pythia8;
+
+//============================================================================
+
+int main() {
+
+  // Restrict to threshold region only or not.
+  bool thresholdOnly   = true;
+
+  // Full event generation or only cross-section-oriented studies.
+  bool fullEvents      = false;
+
+  // Number of events.
+  int nEvent           = 1000000;
+
+  // LHC collision energy.
+  double eCM           = 13000.;
+
+  // Example of common possible setup values.
+  double mt            = 172.5;
+  double thrRegion     = 10.;
+  int    alphasOrder   = 2;
+  double alphasValue   = 0.118;
+  double ggSingletFrac = 2. / 7.;
+  double qqSingletFrac = 0.;
+
+  // Histograms.
+  Hist   mHatLow[5], mHatLowZoom[5], mThrOrig[5], mThrOrigZoom[5];
+  for (int scenario = 0; scenario &lt; 5; ++scenario) {
+    mHatLow[scenario].book(&quot;ttbar invariant mass, low&quot;, 100, 300., 400.);
+    mHatLowZoom[scenario].book(&quot;ttbar invariant mass, low&quot;, 100, 330., 355.);
+    mThrOrig[scenario].book(&quot;original threshold&quot;, 100, -20., 80.);
+    mThrOrigZoom[scenario].book(&quot;original threshold, zoom&quot;, 100, -10., 30.);
+  }
+
+  // Compare the five scenarios.
+  for (int scenario = 0; scenario &lt; 5; ++scenario) {
+
+    // Scenario-specific settings choices.
+    int    topModel    = min( scenario, 2);
+    double gammat      = (scenario != 3) ? 1.34 : 0.2;
+    // Warning:  a small gammatGreen may lead to event weights above unity.
+    double gammatGreen = (scenario != 4) ? 1.34 : 0.2;
+
+    // Generator.
+    PythiaParallel pythia;
+
+    // Feed in desired values.
+    pythia.settings.mode(&quot;TopThreshold:model&quot;, topModel);
+    pythia.particleData.m0(6, mt);
+    pythia.readString(&quot;6:doForceWidth = true&quot;);
+    pythia.particleData.mWidth( 6, gammat);
+    pythia.settings.parm(&quot;TopThreshold:tWidthGreen&quot;,   gammatGreen);
+    pythia.settings.parm(&quot;TopThreshold:thrRegion&quot;,     thrRegion);
+    pythia.settings.mode(&quot;TopThreshold:alphasOrder&quot;,   alphasOrder);
+    pythia.settings.parm(&quot;TopThreshold:alphasValue&quot;,   alphasValue);
+    pythia.settings.parm(&quot;TopThreshold:ggSingletFrac&quot;, ggSingletFrac);
+    pythia.settings.parm(&quot;TopThreshold:qqSingletFrac&quot;, qqSingletFrac);
+
+    // Process selection and collision energy.
+    pythia.readString(&quot;Top:gg2ttbar = on&quot;);
+    pythia.readString(&quot;Top:qqbar2ttbar = on&quot;);
+    pythia.settings.parm(&quot;Beams:eCM&quot;, eCM);
+
+    // Restrict to threshold region.
+    if (thresholdOnly) {
+      pythia.readString(&quot;PhaseSpace:mHatMin = 300.&quot;);
+      pythia.readString(&quot;PhaseSpace:mHatMax = 400.&quot;);
+    }
+    else pythia.readString(&quot;PhaseSpace:mHatMin = 200.&quot;);
+
+    // Switch off (most) code parts not relevant here. Reduce printout.
+    if (!fullEvents) {
+      pythia.readString(&quot;PartonLevel:ISR = off&quot;);
+      pythia.readString(&quot;PartonLevel:FSR = off&quot;);
+      pythia.readString(&quot;PartonLevel:MPI = off&quot;);
+      pythia.readString(&quot;HadronLevel:all = off&quot;);
+    }
+    pythia.readString(&quot;Next:numberCount = 100000&quot;);
+
+    // If Pythia fails to initialize, abort this scenario.
+    cout &lt;&lt; &quot; ==============================================================&quot;
+      &quot;=========\n Initializing PYTHIA for scenario &quot; &lt;&lt; scenario
+         &lt;&lt; &quot; with topModel &quot; &lt;&lt; topModel &lt;&lt; &quot; and top mass &quot; &lt;&lt; mt
+         &lt;&lt; &quot; GeV&quot; &lt;&lt; endl;
+    bool ok = pythia.init();
+    cout &lt;&lt; &quot; Completed initialization of PYTHIA for scenario &quot; &lt;&lt; scenario
+         &lt;&lt; &quot;\n ============================================================&quot;
+      &quot;===========\n&quot;;
+    if (!ok) continue;
+
+    // Counters. Real numbers since some events can come with weights &gt; 1.
+    double nEventEff = 0., nBelow2mt = 0., nBelow = 0., nBelowgg = 0.,
+      nBelowqq = 0., nAbovegg = 0., nAboveqq = 0., eBelow = 0.;
+
+    // Run events in parallel.
+    pythia.run(nEvent, [&amp;](Pythia* pythiaPtr) {
+
+      // Original threshold value and other properties. Event weight.
+      double eThr = pythiaPtr-&gt;info.toponiumE;
+      double mHat = pythiaPtr-&gt;info.mHat();
+      double wt   = pythiaPtr-&gt;info.weight();
+
+      // Histogram threshold value and ttbar invariant mass.
+      mHatLow[scenario].fill( mHat, wt);
+      mHatLowZoom[scenario].fill( mHat, wt);
+      mThrOrig[scenario].fill( eThr, wt);
+      mThrOrigZoom[scenario].fill( eThr, wt);
+
+      // Statistics for below- and above-threshold cross sections.
+      nEventEff += wt;
+      if (mHat &lt; 2. * mt) nBelow2mt += wt;
+      if (eThr &lt; 0.) {
+        nBelow += wt;
+        if (pythiaPtr-&gt;info.code() == 601) nBelowgg += wt;
+        else nBelowqq += wt;
+        eBelow += eThr * wt;
+      } else {
+        if (pythiaPtr-&gt;info.code() == 601) nAbovegg += wt;
+        else nAboveqq += wt;
+      }
+
+    // End of event loop.
+    });
+
+    // Normalization and statistics for this scenario.
+    cout &lt;&lt; &quot;\n ===== End-of-run statistics for scenario &quot; &lt;&lt; scenario
+         &lt;&lt; &quot; with topModel &quot; &lt;&lt; topModel &lt;&lt; &quot; and top mass &quot; &lt;&lt; mt
+         &lt;&lt; &quot; GeV =====&quot; &lt;&lt; endl;
+
+    // Normalize histogram to cross section, in pb/GeV.
+    double sigmaGen         = 1e9 * pythia.sigmaGen();
+    double sigmapb          = sigmaGen / nEventEff;
+    mHatLow[scenario]      *= sigmapb;
+    mHatLowZoom[scenario]  *= 4. * sigmapb;
+    mThrOrig[scenario]     *= sigmapb;
+    mThrOrigZoom[scenario] *= 2.5 * sigmapb;
+
+    // Statistics and cross sections.
+    pythia.stat();
+    double sigma2mt = sigmapb * nBelow2mt;
+    double sigAbv   = sigmapb * (nEventEff - nBelow);
+    double sigAbvgg = sigmapb * nAbovegg;
+    double sigAbvqq = sigmapb * nAboveqq;
+    double sigBel   = sigmapb * nBelow;
+    double sigBelgg = sigmapb * nBelowgg;
+    double sigBelqq = sigmapb * nBelowqq;
+    cout &lt;&lt; &quot;\n total sigma in studied region = &quot; &lt;&lt; fixed &lt;&lt; setprecision(3)
+         &lt;&lt; sigmaGen &lt;&lt; &quot; pb whereof below 2 mt = &quot; &lt;&lt; sigma2mt &lt;&lt; &quot; pb&quot;
+         &lt;&lt; endl &lt;&lt; &quot; sigma above threshold = &quot;  &lt;&lt; sigAbv &lt;&lt; &quot; pb&quot; &lt;&lt; endl
+         &lt;&lt; &quot;   whereof gg = &quot; &lt;&lt; sigAbvgg &lt;&lt; &quot; pb and qq = &quot; &lt;&lt; sigAbvqq
+         &lt;&lt; &quot; pb&quot; &lt;&lt; endl &lt;&lt; &quot; sigma below threshold = &quot; &lt;&lt; sigBel
+         &lt;&lt; &quot; pb&quot; &lt;&lt; endl &lt;&lt; &quot;   whereof gg = &quot; &lt;&lt; sigBelgg &lt;&lt; &quot; pb and qq = &quot;
+         &lt;&lt; sigBelqq &lt;&lt; &quot; pb&quot; &lt;&lt; endl;
+    eBelow /= max(1., nBelow);
+    cout &lt;&lt; &quot; average energy for below-threshold part = &quot; &lt;&lt; eBelow
+         &lt;&lt; &quot; GeV&quot; &lt;&lt; endl;
+
+  // End loop over threshold cases.
+  }
+
+  // Histograms with pyplot. Common notation.
+  HistPlot hpl(&quot;plot370&quot;);
+  string symbol[5] = {&quot;h,black&quot;, &quot;h,olive&quot;, &quot;h,red&quot;, &quot;h,orange&quot;, &quot;h,blue&quot;};
+  string legend[5] = {&quot;Born&quot;, &quot;Coulomb&quot;, &quot;Green&apos;s, wide BW and ME&quot;,
+      &quot;Green&apos;s, narrow BW&quot;, &quot;Green&apos;s, narrow ME&quot;};
+
+  // Invariant mass of the ttbar pair.
+  hpl.frame(&quot;fig370&quot;, &quot;invariant mass of ttbar pair, near threshold&quot;,
+    &quot;$m(t+tbar) (GeV)$&quot;, &quot;$\\mathrm{d}\\sigma/\\mathrm{d}m$ (pb/GeV)&quot;);
+  for (int scenario = 0; scenario &lt; 5; ++scenario)
+    hpl.add( mHatLow[scenario], symbol[scenario], legend[scenario]);
+  hpl.plot();
+  hpl.frame(&quot;&quot;, &quot;invariant mass of ttbar pair, near threshold, zoom-in&quot;,
+    &quot;$m(t+tbar) (GeV)$&quot;, &quot;$\\mathrm{d}\\sigma/\\mathrm{d}m$ (pb/GeV)&quot;);
+  for (int scenario = 0; scenario &lt; 5; ++scenario)
+    hpl.add( mHatLowZoom[scenario], symbol[scenario], legend[scenario]);
+  hpl.plot();
+
+  // The formal E_thr value above/below threshold, key for reweighting.
+  hpl.frame(&quot;&quot;, &quot;Energy above or below threshold&quot;,
+    &quot;$E$ (GeV)&quot;, &quot;$\\mathrm{d}\\sigma/\\mathrm{d}m$ (pb/GeV)&quot;);
+  for (int scenario = 0; scenario &lt; 5; ++scenario)
+    hpl.add( mThrOrig[scenario], symbol[scenario], legend[scenario]);
+  hpl.plot();
+  hpl.frame(&quot;&quot;, &quot;Energy above or below threshold, zoom-in&quot;,
+    &quot;$E$ (GeV)&quot;, &quot;$\\mathrm{d}\\sigma/\\mathrm{d}m$ (pb/GeV)&quot;);
+  for (int scenario = 0; scenario &lt; 5; ++scenario)
+    hpl.add( mThrOrigZoom[scenario], symbol[scenario], legend[scenario]);
+  hpl.plot();
+
+  // Done.
+  return 0;
+}
+</code></pre></body></html>

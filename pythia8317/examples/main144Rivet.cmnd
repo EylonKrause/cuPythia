@@ -1,0 +1,12 @@
+# This command file enables RIVET usage with main144. See RIVET usage
+# in the HTML manual for further details.
+
+# Load the RIVET plugin.
+Init:plugins = {libpythia8rivet.so::RivetHooks}
+
+# Set the RIVET output.
+Rivet:fileName = main144.yoda
+
+# Names of Rivet analyses to be run, provided as a comma-separated list.
+# Analysis parameters can be added as ANALYSIS:KEY=VAL:KEY=VAL.
+Rivet:analyses = {ATLAS_2010_I882098,ALICE_2010_S8625980,CMS_2011_I930319}

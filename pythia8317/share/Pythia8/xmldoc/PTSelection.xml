@@ -1,0 +1,80 @@
+<chapter name="PTSelection"> 
+ 
+<h2>pT Selection</h2> 
+ 
+The <code>StringPT</code> class handles the choice of fragmentation 
+transverse momentum <ei>pT</ei>. At each string breaking the quark 
+and antiquark of the produced pair, or the diquark and antidiquark, 
+are supposed to receive opposite and compensating <ei>pT</ei> kicks. 
+How they are distributed depends on the following flag: 
+ 
+<p/> 
+In more detail, the quarks receive <ei>pT</ei> kicks according to a 
+Gaussian distribution in <ei>p_x</ei> and <ei>p_y</ei> separately. 
+Call <ei>sigma_q</ei> the width of the <ei>p_x</ei> and  <ei>p_y</ei> 
+distributions separately, i.e. 
+<eq> 
+    d(Prob) = exp( -(p_x^2 + p_y^2) / 2 sigma_q^2). 
+</eq> 
+Then the total squared width is 
+<eq> 
+    &lt;pT^2> = &lt;p_x^2> +  &lt;p_y^2> = 2 sigma_q^2 = sigma^2. 
+</eq> 
+It is this latter number that is stored in 
+ 
+<parm name="StringPT:sigma" default="0.335" min="0.0" max="1.0"> 
+the width <ei>sigma</ei> in the fragmentation process. 
+</parm> 
+ 
+<p/> 
+Since a normal hadron receives <ei>pT</ei> contributions for two string 
+breakings, it has a 
+<eq> 
+    &lt;p_x^2>_had = &lt;p_y^2>_had = sigma^2, 
+</eq> 
+and thus <ei>&lt;pT^2>_had = 2 sigma^2</ei>. 
+ 
+<p/> 
+Some studies on isolated particles at LEP has indicated the need for 
+a slightly enhanced rate in the high-<ei>pT</ei> tail of the above 
+distribution. This would have to be reviewed in the context of a 
+complete retune of parton showers and hadronization, but for the 
+moment we stay with the current recipe, to boost the above <ei>pT</ei> 
+by a factor <ei>enhancedWidth</ei> for a small fraction 
+<ei>enhancedFraction</ei> of the breakups, where 
+ 
+<parm name="StringPT:enhancedFraction" default="0.01" min="0.0" max="1."> 
+<ei>enhancedFraction</ei>,the fraction of string breaks with enhanced 
+width. 
+</parm> 
+ 
+<parm name="StringPT:enhancedWidth" default="2.0" min="1.0" max="10.0"> 
+<ei>enhancedWidth</ei>,the enhancement of the width in this fraction. 
+</parm> 
+ 
+<p/> 
+In the context of some toy studies <ref>Fis16</ref> the following three 
+options have also been introduced, but are not part of any recommended 
+framework. 
+ 
+<parm name="StringPT:widthPreStrange" default="1.0" min="1.0" max="10.0"> 
+Prefactor multiplying the Gaussian width for strange quarks. 
+</parm> 
+ 
+<parm name="StringPT:widthPreQQ0" default="1.0" min="1.0" max="10.0"> 
+Prefactor multiplying the Gaussian width for spin-0 diquarks. In case of 
+diquarks with one or two strange quarks the prefactor is calculated by 
+multiplying <ei>widthPreQQ0</ei> once or twice respectively with 
+<ei>widthPreStrange</ei>. 
+</parm> 
+ 
+<parm name="StringPT:widthPreQQ1" default="1.0" min="1.0" max="10.0"> 
+Prefactor multiplying the Gaussian width for spin-1 diquarks. In case of 
+diquarks with one or two strange quarks the prefactor is calculated by 
+multiplying <ei>widthPreQQ1</ei> once or twice respectively with 
+<ei>widthPreStrange</ei>. 
+</parm> 
+ 
+</chapter> 
+ 
+<!-- Copyright (C) 2026 Torbjorn Sjostrand --> 

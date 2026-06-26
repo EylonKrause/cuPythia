@@ -1,0 +1,133 @@
+<chapter name="ThermalFragmentation"> 
+ 
+<h2>Thermal String Fragmentation</h2> 
+ 
+The thermal model <ref>Fis16</ref> is an attempt to combine global 
+flavour and <ei>pT</ei> concepts familiar from the heavy-ion 
+community with the local conservation rules obtained in a string 
+framework. To replace the standard Lund fragmentation model with 
+the thermal one you need to set <code> Fragmentation:model = 1</code> 
+in your main program. 
+ 
+<p/> 
+One can give at least three arguments why it is not a 
+completely crazy variation of the standard Lund fragmentation 
+setup. Firstly, low-energy low-<ei>pT</ei> data for many 
+hadron species are empirically well described by <ei>pT</ei> 
+spectra of the shape <ei>exp(-6 mT)</ei>, where <ei>mT</ei> 
+is the hadron transverse mass. Secondly, Hagedorn's 
+thermodynamical arguments suggest that indeed hadron <ei>pT</ei> 
+spectra should be of the shape <ei>exp(-mT / T)</ei>, 
+where <ei>T</ei> is the temperature of the particle-producing 
+source. Thirdly, one could imagine that a string is fluctuating 
+along its length, where a contraction leads to an increased string 
+tension, and vice versa. Bialas showed that a reasonable ansatz 
+for such fluctuations can turn a Gaussian <ei>pT</ei> distribution 
+into an exponential one. 
+ 
+<p/> 
+The current framework keeps most of the string fragmentation code 
+unchanged. The big differences are that the new derived classes 
+<code>ThermalStringFlav</code> and <code>ThermalStringpT</code> 
+take care of flavour and pT selection, with free parameters as 
+described below. The longitudinal selection in <code>StringZ</code> 
+remains unchanged, so the settings on the 
+<aloc href="ZSelection">z Selection</aloc> page can be used also 
+here. 
+ 
+<p/> 
+In the thermal fragmentation, as implemented here, the <ei>pT</ei> 
+selection has to be done before the flavour one, which is opposite 
+to the order in normal string fragmentation. (Although of less 
+relevance there.) To cover both possibilities, the 
+<code>StringFragmentation</code> class has a method 
+<code>setFlavBeforePT</code> to fix the order. In either option the 
+<ei>z</ei> selection occurs last. 
+ 
+<a name="thermPT"></a> 
+<h3>Transverse momentum selection</h3> 
+ 
+The quark <ei>pT</ei> is generated according to a complicated 
+expression (involving the Bessel <ei>K_{1/4}</ei> function), 
+such that the resulting hadron <ei>pT</ei> follows a thermal 
+distribution 
+<eq> 
+    d(Prob) = exp( -pT_had/T) d^2pT_had 
+</eq> 
+with temperature <ei>T</ei>, whose value is given by 
+<parm name="StringPT:temperature" default="0.21" min="0.1" max="0.5"> 
+the temperature <ei>T</ei> in the fragmentation process, in units of GeV. 
+</parm> 
+<parm name="StringPT:tempPreFactor" default="1.21" min="1.0" max="1.5"> 
+Temperature prefactor for strange quarks and diquarks. Default is 
+determined so as to give the same average <ei>pT</ei> in 
+<ei>u/d &rarr; s</ei> and <ei>s &rarr; u/d</ei> transitions, which 
+also is the reason this parameter has been introduced. 
+</parm> 
+ 
+<a name="thermFlav"></a> 
+<h3>Flavour selection</h3> 
+ 
+With the hadronic <ei>pT</ei> generated according to the thermal 
+distribution, the choice of a new flavour in the fragmentation 
+process, and the production of a new hadron from a set of input 
+flavours, depends mainly on the hadron mass <ref>Fis16</ref>. 
+For a given <ei>pT</ei> value the new flavour is chosen according to 
+<eq> 
+  exp( -mT_had/T) = exp( - sqrt( pT_had^2 + mT_had^2 )/T). 
+</eq> 
+Here <ei>T</ei> is primarily given by <code>StringPT:temperature</code>, 
+but can be further modified in the context of 
+<aloc href="ClosePacking">closely packed strings</aloc>, 
+<code>ClosePacking:doClosePacking = on</code>. 
+ 
+<p/> 
+Additional factors are included from theory arguments, for instance 
+the ratio of vector-to-pseudocalar meson production is set according 
+to spin-counting rules.  The octet-singlet mixing angles in the 
+light-quark meson nonets are taken the same as for Lund strings. 
+Currently popcorn production has not been implemented, i.e. a baryon 
+and an antibaryon are nearest neighbours in the flavour fragmentation 
+chain, and share the flavours of one diquark. 
+In addition the following two factors are introduced to provide an 
+improved description of the flavour composition, although not as good 
+as obtained in the default Gaussian scenario, with its bigger selection 
+of free parameters. 
+ 
+<p/> 
+<parm name="StringFlav:BtoMratio" default="0.357" min="0.1" max="10.0"> 
+Ratio of the relative rate of baryon to meson production, i.e. every 
+baryon Clebsch-Gordan coefficient gets multiplied by this factor. 
+</parm> 
+ 
+<p/> 
+<parm name="StringFlav:StrangeSuppression" default="0.5" min="0.01" max="1.0"> 
+Extra suppression factor for strange quarks. Note that in case of more 
+than one strange quark in the hadron the factor gets squared or tripled 
+respectively. 
+</parm> 
+ 
+<p/> 
+The following parameters are used to determine which hadrons to choose 
+from. By default only the pseudoscalar and vector meson nonet (L=0) 
+and baryons with u/d/s quarks are included. For an already-existing 
+heavier flavour, say c or b, this corresponds to picking only u/d/s 
+for the new quark(s). 
+<note>Note:</note> The computer time for selecting the flavour of new 
+hadrons goes linearly with the number of hadrons included. Therefore 
+we recommend sticking to the default options as heavier hadrons are 
+produced less likely anyway. 
+ 
+<mode name="StringFlav:nQuark" default="3" min="3" max="5"> 
+Selects the newly produced quark flavours that may be included in hadrons. 
+The default corresponds to only include u/d/s quarks. 
+</mode> 
+ 
+<flag name="StringFlav:mesonNonetL1" default="off"> 
+Switch on to include the pseudovector, scalar, pseudovector, and tensor 
+nonet (L=1). 
+</flag> 
+ 
+</chapter> 
+ 
+<!-- Copyright (C) 2026 Torbjorn Sjostrand --> 

@@ -1,0 +1,25 @@
+# --- Pythia build artifacts (reproducible from source) ---
+pythia8317/tmp/
+pythia8317/lib/
+pythia8317/.cache/
+*.o
+*.a
+*.so
+*.so.*
+
+# Compiled example binaries (3-digit mainNNN with no extension); keep the sources
+pythia8317/examples/main[0-9][0-9][0-9]
+pythia8317/examples/*.dat
+pythia8317/examples/hepmcout*
+
+# Source tarball (re-downloadable from pythia.org)
+*.tgz
+
+# cuPy GPU build outputs
+build/
+cupy/**/*.out
+cupy/**/bench_*
+
+# Scratch / logs
+*.log
+*.tmp

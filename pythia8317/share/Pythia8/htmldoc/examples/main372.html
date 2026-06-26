@@ -1,0 +1,194 @@
+<html><head><title>main372</title>
+<link rel="stylesheet" type="text/css" href="../pythia.css"/>
+<link rel="shortcut icon" href="../pythia32.gif"/></head><body><h2>main372</h2>
+Back to <a href="../ExampleKeywords.html" target="page">index.</a>
+<pre><code class="language-c++">
+// main372.cc is a part of the PYTHIA event generator.
+// Copyright (C) 2026 Torbjorn Sjostrand.
+// PYTHIA is licenced under the GNU GPL v2 or later, see COPYING for details.
+// Please respect the MCnet Guidelines, see GUIDELINES for details.
+
+// Authors:
+//            <a href="mailto:torbjorn.sjostrand@fysik.lu.se">Torbjörn Sjöstrand</a>
+//            <a href="mailto:christian.preuss@uni-goettingen.de">Christian T. Preuss</a>
+
+// Keywords:
+//            <a href="../ExampleKeywords.html#top">Top</a>
+//            <a href="../ExampleKeywords.html#toponium">Toponium</a>
+//            <a href="../ExampleKeywords.html#spin+correlations">Spin&nbsp;correlations</a>
+
+// Study spin correlations of the t-tbar system in t-tbar production
+// below threshold.
+
+#include &quot;Pythia8/Pythia.h&quot;
+using namespace Pythia8;
+
+//==========================================================================
+
+int main() {
+
+  // Number of events. Full event simulation or simplified.
+  int  nEvent = 1000000;
+  bool fullEvents = false;
+
+  // Book histograms.
+  Hist coslmlpOff[6], coslmlpOn[6];
+  for (int eBin = 0; eBin &lt; 6; ++eBin) {
+    coslmlpOff[eBin].book( &quot;cosTheta(l-, l+), off&quot;, 40, -1., 1.);
+    coslmlpOn[eBin].book( &quot;cosTheta(l-, l+), on&quot;, 40, -1., 1.);
+  }
+
+  // Loop over angular correlations on or off.
+  for (int iOO = 0; iOO &lt; 2; ++iOO) {
+
+    // Off/on pseudoscalar angular correlations, and range where dampened out.
+    bool   doPseudoscalar  = (iOO == 0) ? false : true;
+    double eBegDamp        = 10.;
+    double eEndDamp        = 20.;
+
+    // Example of other possible setup values.
+    int    topModel        = 2;
+    double mt              = 172.5;
+    double gammat          = 1.34;
+    double gammatGreen     = 1.34;
+    double thresholdRegion = 10.;
+    int    alphasOrder     = 2;
+    double alphasValue     = 0.118;
+    double ggSingletFrac   = 2./7.;
+    double qqSingletFrac   = 0.;
+
+    // Generator.
+    Pythia pythia;
+
+    // Process setup: select sequence t -&gt; b W -&gt; b lepton antilepton.
+    pythia.readString(&quot;Top:gg2ttbar = on&quot;);
+    pythia.readString(&quot;Top:qqbar2ttbar = on&quot;);
+    pythia.readString(&quot;6:onMode = off&quot;);
+    pythia.readString(&quot;6:onIfAll = 24 5&quot;);
+    pythia.readString(&quot;24:onMode = off&quot;);
+    pythia.readString(&quot;24:onIfAny = 11 13&quot;);
+
+    // Kinematics setup: threshold region only.
+    pythia.readString(&quot;Beams:eCM = 13000.&quot;);
+    pythia.readString(&quot;PhaseSpace:mHatMin = 300.&quot;);
+    pythia.readString(&quot;PhaseSpace:mHatMax = 400.&quot;);
+
+    // Top threshold model setup.
+    pythia.settings.mode(&quot;TopThreshold:model&quot;, topModel);
+    pythia.particleData.m0(6, mt);
+    pythia.readString(&quot;6:doForceWidth = true&quot;);
+    pythia.particleData.mWidth( 6, gammat);
+    pythia.settings.parm(&quot;TopThreshold:tWidthGreen&quot;, gammatGreen);
+    pythia.settings.parm(&quot;TopThreshold:thrRegion&quot;, thresholdRegion);
+    pythia.settings.mode(&quot;TopThreshold:alphasOrder&quot;, alphasOrder);
+    pythia.settings.parm(&quot;TopThreshold:alphasValue&quot;, alphasValue);
+    pythia.settings.parm(&quot;TopThreshold:ggSingletFrac&quot;, ggSingletFrac);
+    pythia.settings.parm(&quot;TopThreshold:qqSingletFrac&quot;, qqSingletFrac);
+    pythia.settings.flag(&quot;TopThreshold:pseudoscalar&quot;, doPseudoscalar);
+    pythia.settings.parm(&quot;TopThreshold:psEBeginDamp&quot;, eBegDamp);
+    pythia.settings.parm(&quot;TopThreshold:psEEndDamp&quot;, eEndDamp);
+
+    // Switch off (most) code parts not relevant here. Reduce printout.
+    if (!fullEvents) {
+      pythia.readString(&quot;PartonLevel:ISR = off&quot;);
+      pythia.readString(&quot;PartonLevel:FSR = off&quot;);
+      pythia.readString(&quot;PartonLevel:MPI = off&quot;);
+      pythia.readString(&quot;HadronLevel:all = off&quot;);
+    }
+    pythia.readString(&quot;Next:numberCount = 100000&quot;);
+
+    // If Pythia fails to initialize, exit with error.
+    if (!pythia.init()) return 1;
+
+    // Begin event loop. Generate event. Skip if error. List first one.
+    for (int iEvent = 0; iEvent &lt; nEvent; ++iEvent) {
+      if (!pythia.next()) continue;
+
+      // Create working copy of process record and boost it longitudinally
+      // to the t + tbar rest frame. List first boosted event.
+      Event work = pythia.process;
+      double betaz = (work[5].pz() + work[6].pz()) /
+        (work[5].e() + work[6].e());
+      work.bst(0., 0., -betaz);
+      if (iEvent == 0) {
+        cout &lt;&lt; &quot;\n Listing of work, i.e. process boosted to &quot;
+          &quot;the t + tbar rest frame:&quot;;
+        work.list();
+      }
+
+      // Order ttbar system and the decay products (treg = t).
+      int itreg = (work[5].id() == 6) ? 5 : 6;
+      int itbar = 11 - itreg;
+      int iWpos = work[itreg].daughter1();
+      int iWneg = work[itbar].daughter1();
+      // The W+- decay products, ferm = fermion, anti = antifermion.
+      int iWposferm = work[iWpos].daughter1();
+      int iWposanti = work[iWpos].daughter2();
+      if (work[iWposferm].id() &lt; 0) swap( iWposferm, iWposanti);
+      int iWnegferm = work[iWneg].daughter1();
+      int iWneganti = work[iWneg].daughter2();
+      if (work[iWnegferm].id() &lt; 0) swap( iWnegferm, iWneganti);
+
+      // Angle between l- and l+  in subprocess rest frame.
+      double cosThetalmlp  = costheta( work[iWnegferm].p(),
+        work[iWposanti].p() );
+
+      // Energy relative to nominal threshold, and derived energy bins.
+      double eThr = pythia.info.toponiumE;
+      int eBin = 0;
+      if (eThr &gt; eEndDamp) eBin = 4;
+      else if (eThr &gt; 0.5 * (eBegDamp + eEndDamp)) eBin = 3;
+      else if (eThr &gt; eBegDamp) eBin = 2;
+      else if (eThr &gt; 0.) eBin = 1;
+
+      // Fill histograms, with event weight just in case.
+      double wt   = pythia.info.weight();
+      if (iOO == 0) coslmlpOff[eBin].fill( cosThetalmlp, wt);
+      else          coslmlpOn[eBin].fill( cosThetalmlp, wt);
+
+    // End of event loop. Statistics. End of off/on pseudoscalar angles.
+    }
+    pythia.stat();
+  }
+
+  // Combine threshold region. Normalize histograms to unit area.
+  coslmlpOff[5] = coslmlpOff[0] + coslmlpOff[1];
+  coslmlpOn[5] = coslmlpOn[0] + coslmlpOn[1];
+  for (int eBin = 0; eBin &lt; 6; ++eBin) {
+    coslmlpOff[eBin].normalize(20.);
+    coslmlpOn[eBin].normalize(20.);
+  }
+
+  // Plot histograms.
+  HistPlot hpl(&quot;plot372&quot;);
+  string linest[5] = { &quot;h,black&quot;, &quot;h,red&quot;, &quot;h,blue&quot;, &quot;h,magenta&quot;, &quot;h,olive&quot;};
+  string captst[5] = { &quot;below threshold&quot;, &quot;below damping region&quot;,
+    &quot;begin damping region&quot;, &quot;end damping region&quot;, &quot;above damping region&quot;};
+
+  // All histograms with off or on, respectively.
+  hpl.frame(&quot;fig372&quot;,
+    &quot;cosine of opening angle between two leptons, no correlations&quot;,
+    &quot;$\\cos\\theta_{\\ell^+\\ell^-}$&quot;,  &quot;normalized rate&quot;);
+  for (int eBeg = 0; eBeg &lt; 5; ++eBeg)
+    hpl.add(coslmlpOff[eBeg], linest[eBeg], captst[eBeg]);
+  hpl.plot( -1., 1., 0., 1.);
+  hpl.frame(&quot;&quot;,
+    &quot;cosine of opening angle between two leptons, with correlations&quot;,
+    &quot;$\\cos\\theta_{\\ell^+\\ell^-}$&quot;,  &quot;normalized rate&quot;);
+  for (int eBeg = 0; eBeg &lt; 5; ++eBeg)
+    hpl.add(coslmlpOn[eBeg], linest[eBeg], captst[eBeg]);
+  hpl.plot( -1., 1., 0., 1.);
+
+  // Threshold region, off vs on.
+  hpl.frame(&quot;&quot;,
+    &quot;cosine of opening angle between two leptons, without/with correlations&quot;,
+    &quot;$\\cos\\theta_{\\ell^+\\ell^-}$&quot;,  &quot;normalized rate&quot;);
+  hpl.add(coslmlpOff[5], &quot;h,red&quot;, &quot;threshold region, no correlations&quot;);
+  hpl.add(coslmlpOn[5], &quot;h,blue&quot;, &quot;threshold region, with correlations&quot;);
+  hpl.plot( -1, 1., 0., 1.);
+
+  // Done.
+  return 0;
+
+}
+</code></pre></body></html>

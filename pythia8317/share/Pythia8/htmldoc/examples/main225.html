@@ -1,0 +1,46 @@
+<html><head><title>main225</title>
+<link rel="stylesheet" type="text/css" href="../pythia.css"/>
+<link rel="shortcut icon" href="../pythia32.gif"/></head><body><h2>main225</h2>
+Back to <a href="../ExampleKeywords.html" target="page">index.</a>
+<pre><code class="language-c++">
+// main225.cc is a part of the PYTHIA event generator.
+// Copyright (C) 2026 Torbjorn Sjostrand.
+// PYTHIA is licenced under the GNU GPL v2 or later, see COPYING for details.
+// Please respect the MCnet Guidelines, see GUIDELINES for details.
+
+// Authors:
+//            <a href="mailto:philten@cern.ch">Philip Ilten</a>
+
+// Keywords:
+//            <a href="../ExampleKeywords.html#command+file">Command&nbsp;file</a>
+//            <a href="../ExampleKeywords.html#rivet">Rivet</a>
+//            <a href="../ExampleKeywords.html#parallelism">Parallelism</a>
+
+// Demonstrates how to use the RivetHooks plugin to run Rivet
+// analyses, both with a single Pythia instance and PythiaParallel.
+
+#include &quot;Pythia8/PythiaParallel.h&quot;
+
+using namespace Pythia8;
+int main() {
+
+  // Example run with Pythia parallel.
+  PythiaParallel pythiaP;
+  pythiaP.readFile(&quot;main225.cmnd&quot;, 0);
+  if (!pythiaP.init()) return 1;
+  pythiaP.run([&amp;](Pythia*){});
+  pythiaP.stat();
+
+  // Same run, but with single Pythia instance.
+  Pythia pythiaS;
+  pythiaS.readFile(&quot;main225.cmnd&quot;, 1);
+  if (!pythiaS.init()) return 1;
+  int nEvent = pythiaS.mode(&quot;Main:numberOfEvents&quot;);
+  int iEvent = 0;
+  while (iEvent &lt; nEvent)
+    if (pythiaS.next()) ++iEvent;
+  pythiaS.stat();
+  return 0;
+
+}
+</code></pre></body></html>

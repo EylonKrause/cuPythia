@@ -1,0 +1,373 @@
+<html>
+<head>
+<title>Random Numbers</title>
+<link rel="stylesheet" type="text/css" href="pythia.css"/>
+<link rel="shortcut icon" href="pythia32.gif"/>
+</head>
+<body>
+ 
+<h2>Random Numbers</h2> 
+<ol id="toc">
+  <li><a href="#section0">Internal random numbers</a></li>
+  <li><a href="#section1">External random numbers</a></li>
+  <li><a href="#section2">MIXMAX random numbers</a></li>
+  <li><a href="#section3">The methods</a></li>
+  <li><a href="#section4">Random number debugging</a></li>
+</ol>
+
+ 
+This page describes the random-number generator in PYTHIA and 
+how it can be replaced by an external one. 
+ 
+<a name="section0"></a> 
+<h3>Internal random numbers</h3> 
+ 
+The <code>Rndm</code> class generates random numbers, using the 
+Marsaglia-Zaman-Tsang algorithm [<a href="Bibliography.html#refMar90" target="page">Mar90</a>]. 
+ 
+<p/> 
+Random numbers <code>R</code> uniformly distributed in 
+<code>0 &lt; R &lt; 1</code> are obtained with 
+<pre> 
+   Rndm::flat(); 
+</pre> 
+There are also methods to generate according to an exponential, to 
+<i>x * exp(-x)</i>, to a Gaussian, or picked among a set of 
+possibilities, which make use of <code>flat()</code>. 
+ 
+<p/> 
+If the random number generator is not initialized before, it will be 
+so the first time it is asked to generate a random number, and then 
+with the default seed, 19780503. This means that, by default, all runs 
+will use identically the same random number sequence. This is 
+convenient for debugging purposes, but dangerous if you intend to 
+run several "identical" jobs to boost statistics. You can initialize, 
+or reinitialize, with your own choice of seed with a 
+<pre> 
+   Rndm::init(seed); 
+</pre> 
+Here values <code>0 &lt; seed &lt; 900 000 000</code> gives so many 
+different random number sequences, while <code>seed = 0</code> will call 
+the <code>Stdlib time(0)</code> function to provide a "random" 
+<code>seed</code>, and <code>seed &lt; 0</code> will revert back to 
+the default <code>seed</code>. 
+ 
+<p/> 
+The <code>Pythia</code> class defines <a href="RandomNumberSeed.html" target="page">a 
+flag and a mode</a>, that allows the <code>seed</code> to be set in 
+the <code>Pythia::init</code> call. That would be the standard way for a 
+user to pick the random number sequence in a run. 
+ 
+<a name="section1"></a> 
+<h3>External random numbers</h3> 
+ 
+<code>RndmEngine</code> is a base class for the external handling of 
+random-number generation. The user-written derived class is called 
+if a pointer to it has been handed in with the 
+<code>pythia.rndmEnginePtr()</code> method. Since the default 
+Marsaglia-Zaman-Tsang algorithm is quite good, chances are that any 
+replacement would be a step down, but this may still be required by 
+consistency with other program elements in big experimental frameworks. 
+ 
+<p/> 
+There is only one pure virtual method in <code>RndmEngine</code>, to 
+generate one random number flat in the range between 0 and 1: 
+<pre> 
+  virtual double flat() = 0; 
+</pre> 
+Note that methods for initialization are not provided in the base 
+class, in part since input parameters may be specific to the generator 
+used, in part since initialization can as well be taken care of 
+externally to the <code>Pythia</code> code. 
+ 
+<p/> 
+An example illustrating how to run with an external random number 
+generator is provided in <code>main245.cc</code>. 
+ 
+<a name="section2"></a> 
+<h3>MIXMAX random numbers</h3> 
+ 
+The MIXMAX class of random number generators utilizes 
+matrix-recursion based on Anosov-Kolmogorov C-K systems, with the 
+ability to create a large number of statistically independent 
+sequences of random numbers based on different initial seeds. This is 
+particularly advantageous in creating statistically independent 
+samples when running a large number of parallel jobs, each with a 
+different initial seed. In the plugin 
+header <code>Pythia8Plugins/MixMax.h</code> an implementation of a 
+MIXMAX random number generator is provided [<a href="Bibliography.html#refSav91" target="page">Sav91</a>,<a href="Bibliography.html#refSav15" target="page">Sav15</a>], 
+courtesy of Konstantin Savvidy, as well as a PYTHIA interface through 
+the <code>MixMaxRndm</code> class. 
+ 
+In this implementation a dimensionality of 17 is used, as this has 
+been found to provide faster access to large numbers of independent 
+sequences. A timing comparison between the external MIXMAX random 
+number generator, and the default internal PYTHIA random number 
+generator is provided in the example <code>main245.cc</code>. The 
+MIXMAX random number generator is found to be comparable in speed to 
+the default generator. The primary methods of 
+the <code>MixMaxRndm</code> class are given here. 
+ 
+<a name="anchor1"></a>
+<p/><strong> MixMaxRndm::MixMaxRndm(int seed0, int seed1, int seed2, int seed3) &nbsp;</strong> <br/>
+for the given four 32-bit seed numbers. The sequence of numbers 
+produced from this set of seeds is guaranteed not to collide with 
+another if at least one bit of the four seeds is different, and, less 
+than <i>10^100</i> random numbers are thrown. 
+   
+ 
+<a name="section3"></a> 
+<h3>The methods</h3> 
+ 
+We here collect a more complete and formal overview of 
+the <code>Rndm</code> class methods. 
+ 
+<a name="anchor2"></a>
+<p/><strong> Rndm::Rndm() &nbsp;</strong> <br/>
+construct a random number generator, but does not initialize it. 
+   
+ 
+<a name="anchor3"></a>
+<p/><strong> Rndm::Rndm(int seed) &nbsp;</strong> <br/>
+construct a random number generator, and initialize it for the 
+given seed number. 
+   
+ 
+<a name="anchor4"></a>
+<p/><strong> bool Rndm::rndmEnginePtr( RndmEngine* rndmPtr) &nbsp;</strong> <br/>
+pass in pointer for external random number generation. 
+   
+ 
+<a name="anchor5"></a>
+<p/><strong> void Rndm::init(int seed = 0) &nbsp;</strong> <br/>
+initialize, or reinitialize, the random number generator for the given 
+seed number. Not necessary if the seed was already set in the constructor. 
+   
+ 
+<a name="anchor6"></a>
+<p/><strong> double Rndm::flat() &nbsp;</strong> <br/>
+generate next random number uniformly between 0 and 1. 
+   
+ 
+<a name="anchor7"></a>
+<p/><strong> double Rndm::exp() &nbsp;</strong> <br/>
+generate random numbers according to <i>exp(-x)</i>. 
+   
+ 
+<a name="anchor8"></a>
+<p/><strong> double Rndm::xexp() &nbsp;</strong> <br/>
+generate random numbers according to <i>x exp(-x)</i>. 
+   
+ 
+<a name="anchor9"></a>
+<p/><strong> double Rndm::gauss() &nbsp;</strong> <br/>
+generate random numbers according to <i>exp(-x^2/2)</i>. 
+   
+ 
+<a name="anchor10"></a>
+<p/><strong> pair&lt;double, double&gt; Rndm::gauss2() &nbsp;</strong> <br/>
+generate a pair of random numbers according to 
+<i>exp( -(x^2 + y^2) / 2)</i>. Is faster than two calls 
+to <code>gauss()</code>. 
+   
+ 
+<a name="anchor11"></a>
+<p/><strong> pair&lt;Vec4, Vec4&gt; Rndm::phaseSpace2(double eCM, double m1, double m2) &nbsp;</strong> <br/>
+generate a pair of vectors according to the phase space distribution of two 
+particles at the specified eCM and with the specified masses. 
+   
+ 
+<a name="anchor12"></a>
+<p/><strong> int Rndm::pick(const vector&lt;double&gt;&amp; prob) &nbsp;</strong> <br/>
+pick one option among vector of (positive) probabilities. 
+   
+ 
+<a name="anchor13"></a>
+<p/><strong> void Rndm::shuffle(vector&lt;T&gt;&amp; vec) &nbsp;</strong> <br/>
+randomly shuffle a vector of objects (<code>type T</code>, i.e. any type, 
+templated method) according to the Fisher-Yates algorithm. 
+   
+ 
+<a name="anchor14"></a>
+<p/><strong> double Rndm::peekFlat() &nbsp;</strong> <br/>
+peek at the next random number in the sequence without updating 
+the state. Useful for debugging purposes. 
+   
+ 
+<a name="anchor15"></a>
+<p/><strong> bool Rndm::dumpState(string fileName) &nbsp;</strong> <br/>
+save the current state of the random number generator to a binary 
+file. This involves two integers and 100 double-precision numbers. 
+Intended for debug purposes. Note that binary files may be 
+platform-dependent and thus not transportable. 
+   
+ 
+<a name="anchor16"></a>
+<p/><strong> bool Rndm::readState(string fileName) &nbsp;</strong> <br/>
+set the state of the random number generator by reading in a binary 
+file saved by the above command. Comments as above. 
+   
+ 
+<a name="anchor17"></a>
+<p/><strong> RndmState Rndm::getState() &nbsp;</strong> <br/>
+save the current state of the random number generator as a 
+<code>struct RndmState</code>. This can then later be used within the 
+same run, e.g. as input to another <code>Pythia</code> instance. 
+It circumvents the intermediate file of <code>dumpState</code>, 
+but cannot be saved for a later run. 
+   
+ 
+<a name="anchor18"></a>
+<p/><strong> void Rndm::setState(RndmState&amp; state) &nbsp;</strong> <br/>
+set the state of the random number generator by reading in a 
+<code>struct RndmState</code> saved by the above command. 
+Comments as above. 
+   
+ 
+<a name="anchor19"></a>
+<p/><strong> virtual double RndmEngine::flat() &nbsp;</strong> <br/>
+if you want to construct an external random number generator 
+(or generator interface) then you must implement this method 
+in your class derived from the <code>RndmEningen</code> base class, 
+to give a random number between 0 and 1. 
+   
+ 
+<a name="section4"></a> 
+<h3>Random number debugging</h3> 
+ 
+In some cases, when trying to determine where two different versions 
+of the PYTHIA code might diverge, it can be useful to trace all random 
+numbers that are used. In this way, it is possible to see exactly 
+where a random sequence first diverges. An experimental random number 
+number debugging tool is available for advanced debugging. This tool 
+is only available when using the internal PYTHIA random number 
+generation class, <code>Rndm</code>, and can be enabled by specifying 
+the following during the configuration of PYTHIA. 
+<pre> 
+./configure --obj-common=-DRNGDEBUG 
+</pre> 
+Then, when building any of the examples, the random number debugging 
+will be enabled. The output, for example when running 
+<code>main101</code>, will look something like the following. 
+<pre> 
+ParticleDecays::twoBody:flat        3.5433e-01 src/ParticleDecays.cc:546 
+Rndm::exp:flat                      2.7883e-01 src/Basics.cc:96 
+Rndm::exp:flat                      7.8534e-01 src/Basics.cc:96 
+ParticleDataEntry::pickChannel:flat 8.4012e-01 src/ParticleData.cc:542 
+</pre> 
+The printout is specified by the following format. 
+<pre> 
+Class::ClassMethod:RndmMethod RandomNumber Location:LineNumber 
+</pre> 
+Here, <code>Class</code> is the class where the random number is being 
+called, <code>ClassMethod</code> is the method being called, and 
+<code>RndmMethod</code> is the method of <code>Rndm</code> that is 
+being called. This is followed by <code>RandomNumber</code> which is 
+the random number which was returned by the method, and then 
+<code>Location</code> which is the source file where the call was made 
+from, and <code>LineNumber</code> the line number of the call. In some 
+methods, more than just a single number is returned, for example 
+<code>Rndm::phaseSpace2</code>. In this case, all the elements of the 
+returned value are printed (here, four elements for two vectors). 
+ 
+<p/> 
+It is possible to control the output of the debugging with a number of 
+statically defined variables. These variables can be modified in 
+whatever code is being run. 
+<a name="anchor20"></a>
+<p/><strong> bool Rndm::debugNow &nbsp;</strong> <br/>
+This can be used to switch the debug statements on and off. If set to 
+<code>false</code> then the debug statements will not be printed. If 
+set to <code>true</code> (the default) they will be printed. In this 
+way, printing of the debugging can be turned on only after a certain 
+event has passed, for example. 
+   
+<a name="anchor21"></a>
+<p/><strong> bool Rndm::debugLocation &nbsp;</strong> <br/>
+By default, set to <code>true</code>. If set to <code>false</code> the 
+location of the random number generator call within the source code 
+will no longer be printed. This is useful when running a difference on 
+two sets of output. 
+   
+<a name="anchor22"></a>
+<p/><strong> bool Rndm::debugIndex &nbsp;</strong> <br/>
+By default, set to <code>false</code>. If set to <code>true</code> the 
+number of RNG calls will be counted, and the index of the RNG call 
+will be printed. This can be useful when comparing two different 
+outputs where other print statements have been inserted in the code. 
+   
+<a name="anchor23"></a>
+<p/><strong> int Rndm::debugCall &nbsp;</strong> <br/>
+This integer tracks the number of random number generation calls, and 
+can be used to reset the index. 
+   
+<a name="anchor24"></a>
+<p/><strong> int Rndm::debugPrecision &nbsp;</strong> <br/>
+Sets the precision of the random number values being printed. By 
+default, this is <code>4</code> but could be set to <code>17</code>, 
+for example, to print the full precision of a double. 
+   
+ 
+<p/> 
+Because there are a large number of random number calls within PYTHIA, 
+one may wish to filter the output. This can be done by inserting 
+filter strings into the following static variables. These filter 
+strings are applied to the <code>Class::ClassMethod</code> portion of 
+the output, and if any of the defined sets are found, then the RNG 
+call is printed (an OR operation). 
+<a name="anchor25"></a>
+<p/><strong> set&lt;string&gt; Rndm::debugStarts &nbsp;</strong> <br/>
+Print the call if the class name and method starts with this string. 
+   
+<a name="anchor26"></a>
+<p/><strong> set&lt;string&gt; Rndm::debugEnds &nbsp;</strong> <br/>
+Print the call if the class name and method ends with this string. 
+   
+<a name="anchor27"></a>
+<p/><strong> set&lt;string&gt; Rndm::debugContains &nbsp;</strong> <br/>
+Print the call if the class name and method contains this string. 
+   
+<a name="anchor28"></a>
+<p/><strong> set&lt;string&gt; Rndm::debugMatches &nbsp;</strong> <br/>
+Print the call if the class name and method exactly matches this string. 
+   
+ 
+<p/>For example, the following code only keeps calls if they begin with 
+<code>SimpleTimeShower</code> or <code>SimpleSpaceShower</code>. 
+<pre> 
+Rndm::debugStarts.insert("SimpleTimeShower"); 
+Rndm::debugStarts.insert("SimpleSpaceShower"); 
+</pre> 
+ 
+<p/> 
+There are some limitations to the tool. The biggest is that this level 
+of debugging is only possible when the <code>Rndm</code> method name 
+is not used elsewhere in the PYTHIA code. For example, the 
+<code>exp</code> method is used also as just the standard 
+exponential. This means that whenever <code>Rndm::exp</code> is 
+called, the location from where it was called can no longer be 
+reported, only that this method was called, and what value it produced 
+(this can be seen in the example above). In the PYTHIA code, this also 
+currently applies to the <code>pick</code> and <code>shuffle</code> 
+methods. This similarly applies to user code. If <code>flat</code> is 
+used as a method name in user code, than compiling with the 
+<code>-DRNGDEBUG</code> flag will result in the code failing to 
+compile. This can be overcome by including the 
+<code>include/Pythia8/RngDebug.h</code> header after any PYTHIA 
+headers, but before any additional headers. As an example, 
+<code>main144</code> will fail to compile with RNG debugging 
+on. However, the following modification in <code>main144.cc</code> 
+resolves the issue. 
+<pre> 
+#include "Pythia8/Pythia.h" 
+#include "Pythia8/HeavyIons.h" 
+#include "Pythia8/RngDebug.h" 
+#include "Pythia8Plugins/Pythia8Rivet.h" 
+</pre> 
+Here, <code>RngDebug.h</code> has been included after the last PYTHIA 
+header, but before additional headers. 
+ 
+</body>
+</html>
+ 
+<!-- Copyright (C) 2026 Torbjorn Sjostrand --> 

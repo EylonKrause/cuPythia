@@ -1,0 +1,259 @@
+<html><head><title>main303</title>
+<link rel="stylesheet" type="text/css" href="../pythia.css"/>
+<link rel="shortcut icon" href="../pythia32.gif"/></head><body><h2>main303</h2>
+Back to <a href="../ExampleKeywords.html" target="page">index.</a>
+<pre><code class="language-c++">
+// main303.cc is a part of the PYTHIA event generator.
+// Copyright (C) 2026 Torbjorn Sjostrand.
+// PYTHIA is licenced under the GNU GPL v2 or later, see COPYING for details.
+// Please respect the MCnet Guidelines, see GUIDELINES for details.
+
+// Authors:
+//            <a href="mailto:peter.skands@monash.edu">Peter Skands</a>
+
+// Keywords:
+//            <a href="../ExampleKeywords.html#electron-positron">Electron&#8209;positron</a>
+//            <a href="../ExampleKeywords.html#histograms">Histograms</a>
+//            <a href="../ExampleKeywords.html#openmp">Openmp</a>
+
+// Simple example of final-state showers at LEP 1, comparing various options
+// for higher-order corrections (non-singular 1st-order and 2nd-order terms
+// in the branching kernels, with and without 1st-order MECs, and different
+// options for IR regularisations of alphaS) to a few reference settings.
+//
+// Exploits option for parallel runs using OpenMP if the --with-openmp option
+// was used when running the Pythia configure script.
+
+// 1st-order non-singular terms.
+const double cEmitQ = 2.0;
+const double cEmitG = 2.0;
+const double cSplit = 0.0;
+// 2nd-order splitting-function terms.
+const double hEmitHard  = 0.0;
+const double hEmitColl  = 0.0;
+const double hEmitSoft  = 0.0;
+const double hSplitHard = 0.0;
+const double hSplitColl = 0.0;
+// ME corrections on/off.
+const bool   MEcorrections = true;
+// IR cutoff of shower.
+const double cutoff = 1.0;
+// alphaS(mZ) value, running order, and scheme choice.
+const double alphaSmZ     = 0.12;
+const int    alphaSorder  = 2;
+const bool   alphaSuseCMW = true;
+// Maximum alphaS value (in the IR)
+const double alphaSmax = 4.0;
+// Renormalization-scale shift factor (in units of Lambda3).
+const double alphaSrenormShift = 1.0;
+
+// Include Pythia8 header(s) and namespace.
+#include &quot;Pythia8/Pythia.h&quot;
+using namespace Pythia8;
+
+//==========================================================================
+
+// Main program.
+int main() {
+
+  // Arrays to store averages, outside of runs.
+  const int NRUNS = 3;
+  double avgNch[NRUNS], avgTau[NRUNS], avgMaj[NRUNS], avgMin[NRUNS],
+    avgObl[NRUNS];
+
+  // Loop over generator runs. Use OpenMP parallelisation if enabled.
+#ifdef OPENMP
+#pragma omp parallel for
+#endif
+  for (int iRun = 0; iRun &lt; NRUNS; ++iRun) {
+
+    // Define Pythia 8 generator
+    Pythia pythia;
+
+    // Settings for hadronic Z decays.
+    pythia.readString(&quot;Beams:idA =  11&quot;);
+    pythia.readString(&quot;Beams:idB = -11&quot;);
+    pythia.readString(&quot;WeakSingleBoson:ffbar2gmZ = on&quot;);
+    pythia.readString(&quot;23:onMode = off&quot;);
+    pythia.readString(&quot;23:onIfAny = 1 2 3 4 5&quot;);
+    pythia.readString(&quot;PDF:lepton = off&quot;);
+    pythia.readString(&quot;SpaceShower:QEDshowerByL = off&quot;);
+    pythia.readString(&quot;Beams:eCM = 91.2&quot;);
+
+    //----------------------------------------------------------------------
+
+    // Shorthands.
+    Event&amp; event = pythia.event;
+    Settings&amp; settings = pythia.settings;
+
+    // Extract settings to be used in the main program.
+    int    nEvent     = 100000;
+    int    nAbort     = settings.mode(&quot;Main:timesAllowErrors&quot;);
+
+    if ( iRun == 0 ) {
+      // Run 0: Default (Monash) settings.
+    } else if ( iRun == 1 ) {
+      // Run 1: alphaS = 0.118, 2-loop running, and CMW.
+      pythia.readString(&quot;TimeShower:alphaSvalue = 0.118&quot;);
+      pythia.readString(&quot;TimeShower:alphaSorder = 2&quot;);
+      pythia.readString(&quot;TimeShower:alphaSuseCMW = on&quot;);
+    } else {
+      // User-specified settings for effective splitting kernels.
+      settings.parm(&quot;TimeShower:cEmitQ&quot;, cEmitQ);
+      settings.parm(&quot;TimeShower:cEmitG&quot;, cEmitG);
+      settings.parm(&quot;TimeShower:cSplit&quot;, cSplit);
+      settings.parm(&quot;TimeShower:hEmitHard&quot;, hEmitHard);
+      settings.parm(&quot;TimeShower:hEmitColl&quot;, hEmitColl);
+      settings.parm(&quot;TimeShower:hEmitSoft&quot;, hEmitSoft);
+      settings.parm(&quot;TimeShower:hSplitHard&quot;, hSplitHard);
+      settings.parm(&quot;TimeShower:hSplitColl&quot;, hSplitColl);
+      settings.flag(&quot;TimeShower:MEcorrections&quot;, MEcorrections);
+      // Shower IR cutoff.
+      settings.parm(&quot;TimeShower:pTmin&quot;, cutoff);
+      // User-specified settings for alphaS.
+      settings.parm(&quot;TimeShower:alphaSvalue&quot;, alphaSmZ);
+      settings.mode(&quot;TimeShower:alphaSorder&quot;, alphaSorder);
+      settings.flag(&quot;TimeShower:alphaSuseCMW&quot;, alphaSuseCMW);
+      settings.parm(&quot;TimeShower:alphaSmax&quot;, alphaSmax);
+      settings.parm(&quot;TimeShower:alphaSrenormShift&quot;, alphaSrenormShift);
+    }
+
+    // Prevent multithreadhing during init (for nicer output).
+    bool ok = true;
+#ifdef OPENMP
+#pragma omp critical
+#endif
+    {
+      // If Pythia fails to initialize, skip this run.
+      cout &lt;&lt; &quot;Initialising PYTHIA for Run &quot;&lt;&lt; iRun &lt;&lt; endl;
+      ok = pythia.init();
+      cout &lt;&lt; &quot;Finished PYTHIA Initialisation for Run &quot;&lt;&lt; iRun &lt;&lt; endl;
+    }
+    if (!ok) continue;
+
+    //----------------------------------------------------------------------
+
+    // Define instance of Thrust for event analysis.
+    Thrust thrust(1);
+
+    //----------------------------------------------------------------------
+
+    // Define and fill a histogram for effective alphaS value.
+
+    // AlphaS settings (for plotting).
+    AlphaStrong alpS;
+    alpS.init( alphaSmZ, alphaSorder, 6, alphaSuseCMW,
+      alphaSmax, alphaSrenormShift );
+
+    // Plot value of effective AlphaS, logarithmic in Q.
+    int nBinsAS = 100;
+    double qMin = 0.1;
+    double qMax = 100.;
+    Hist hAlphaS(&quot;alphaS&quot;, nBinsAS, qMin, qMax, true);
+    for (int iBin = 1; iBin &lt;= nBinsAS; ++iBin) {
+      double q  = hAlphaS.getBinCenter( iBin );
+      double aS = alpS.alphaS( pow2(q) );
+      hAlphaS.fill( q, aS );
+    }
+
+    // Don&apos;t mix threads when printing the following.
+#ifdef OPENMP
+#pragma omp critical
+#endif
+    {
+      cout &lt;&lt; hAlphaS;
+    }
+
+    //----------------------------------------------------------------------
+
+    // EVENT GENERATION LOOP.
+    // Generation, event-by-event printout, analysis, and histogramming.
+
+    // Counters.
+    double weight = 1.0;
+    double sumWeights = 0.0;
+    double sumTau(0), sumMaj(0), sumMin(0), sumObl(0), sumNch(0);
+
+    // Begin event loop.
+    int iAbort = 0;
+    for (int iEvent = 0; iEvent &lt; nEvent; ++iEvent) {
+
+      bool aborted = !pythia.next();
+      if (aborted){
+        event.list();
+        if (++iAbort &lt; nAbort) {
+          continue;
+        }
+        cout &lt;&lt; &quot; Event generation aborted prematurely, owing to error!\n&quot;;
+        cout &lt;&lt; &quot; Event number was : &quot; &lt;&lt; iEvent &lt;&lt; endl;
+        break;
+      }
+
+      // Check for weights.
+      weight = pythia.info.weight();
+      sumWeights += weight;
+
+      // Count FS charged hadrons, partons, and quarks.
+      int nCharged  = 0;
+      for (int i = 1; i&lt;event.size(); i++) {
+        // Final-state partons.
+        if ( !event[i].isFinal() ) continue;
+        if ( event[i].isCharged() ) nCharged++;
+      }
+
+      // Fill charged multiplicity for this run.
+      sumNch += nCharged * weight;
+
+      // Thrust analysis.
+      thrust.analyze( event );
+      sumTau += weight * (1. - thrust.thrust());
+      sumMaj += weight * thrust.tMajor();
+      sumMin += weight * thrust.tMinor();
+      sumObl += weight * thrust.oblateness();
+
+    }
+
+    //----------------------------------------------------------------------
+
+    // POST-RUN FINALIZATION.
+    // Normalization, Statistics, Output.
+
+    // Normalize histograms to effective number of positive-weight events.
+    double normFac = 1.0/sumWeights;
+
+    // Don&apos;t mix threads when saving to arrays.
+#ifdef OPENMP
+#pragma omp critical
+#endif
+    {
+      avgNch[ iRun ] = sumNch * normFac;
+      avgTau[ iRun ] = sumTau * normFac;
+      avgMaj[ iRun ] = sumMaj * normFac;
+      avgMin[ iRun ] = sumMin * normFac;
+      avgObl[ iRun ] = sumObl * normFac;
+    }
+  }
+
+  // Wait for all threads to complete before printing summary:
+#ifdef OPENMP
+#pragma omp barrier
+#endif
+
+  // Write out averages and RMSD widths.
+  const int nChar = 10;
+  cout &lt;&lt; &quot;\n Summary of runs: &quot; &lt;&lt; endl;
+  for (int iRun = 0; iRun &lt; NRUNS; ++iRun) {
+    cout &lt;&lt; &quot;  iRun = &quot; &lt;&lt; num2str(iRun,2) &lt;&lt;&quot;: &quot;
+         &lt;&lt; &quot;  &lt;tau&gt; = &quot; &lt;&lt; num2str(avgTau[iRun], nChar)
+         &lt;&lt; &quot;  &lt;maj&gt; = &quot; &lt;&lt; num2str(avgMaj[iRun], nChar)
+         &lt;&lt; &quot;  &lt;min&gt; = &quot; &lt;&lt; num2str(avgMin[iRun], nChar)
+         &lt;&lt; &quot;  &lt;obl&gt; = &quot; &lt;&lt; num2str(avgObl[iRun], nChar)
+         &lt;&lt; &quot;  &lt;nCh&gt; = &quot; &lt;&lt; num2str(avgNch[iRun], nChar)
+         &lt;&lt; endl;
+  }
+
+  cout &lt;&lt; endl;
+  // Done.
+  return 0;
+}
+</code></pre></body></html>

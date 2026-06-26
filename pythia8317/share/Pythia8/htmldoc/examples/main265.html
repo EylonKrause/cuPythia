@@ -1,0 +1,250 @@
+<html><head><title>main265</title>
+<link rel="stylesheet" type="text/css" href="../pythia.css"/>
+<link rel="shortcut icon" href="../pythia32.gif"/></head><body><h2>main265</h2>
+Back to <a href="../ExampleKeywords.html" target="page">index.</a>
+<pre><code class="language-c++">
+// main265.cc is a part of the PYTHIA event generator.
+// Copyright (C) 2026 Torbjorn Sjostrand.
+// PYTHIA is licenced under the GNU GPL v2 or later, see COPYING for details.
+// Please respect the MCnet Guidelines, see GUIDELINES for details.
+
+// Authors:
+//            <a href="mailto:christian.bierlich@fysik.lu.se">Christian Bierlich</a>
+//            <a href="mailto:mrenna@fnal.gov">Stephen Mrenna</a>
+//            <a href="mailto:philten@cern.ch">Philip Ilten</a>
+
+// Keywords:
+//            <a href="../ExampleKeywords.html#hadronization">Hadronization</a>
+//            <a href="../ExampleKeywords.html#reweighting">Reweighting</a>
+//            <a href="../ExampleKeywords.html#tuning">Tuning</a>
+
+// Demonstrates how to reweight an event for different hadronization
+// kinematics parameters, after the event has been produced, i.e. post-hoc
+// rather than in-situ reweighting. The result here should be equivalent to
+// the in-situ kinematics reweighitng of main263. The power of this method
+// is that by saving a minimal set of information per event (10
+// doubles per string), the entire event can be reweighted to whatever
+// flavor parameters are requested by the user.
+
+// Pythia includes.
+#include &quot;Pythia8/Pythia.h&quot;
+#include &quot;Pythia8Plugins/KinematicVariations.h&quot;
+#include &quot;Pythia8/PythiaParallel.h&quot;
+
+using namespace Pythia8;
+
+int main() {
+
+  // Define the new set of kinematic parameters that we wish to
+  // reweight to. This can be set at the event level, but we define it
+  // here so that we can compare with the in-situ reweighting.
+  double aLund   = 0.6;  // StringZ:aLund, default 0.68
+  double bLund   = 0.9;  // StringZ:bLund, default 0.98
+  double rFactC  = 1.3;  // StringZ:rFactC, default 1.32
+  double rFactB  = 0.9;  // StringZ:rFactB, default 0.855
+  double ptSigma = 0.3;  // StringPT:sigma, default 0.335
+
+  // Create, configure, and initialize Pythia.
+  PythiaParallel pythia;
+  pythia.readString(&quot;Beams:idA = 11&quot;);
+  pythia.readString(&quot;Beams:idB = -11&quot;);
+  pythia.readString(&quot;Beams:eCM = 91.189&quot;);
+  pythia.readString(&quot;PDF:lepton = off&quot;);
+  pythia.readString(&quot;WeakSingleBoson:ffbar2gmZ = on&quot;);
+  pythia.readString(&quot;23:onMode = off&quot;);
+  pythia.readString(&quot;23:onIfAny = 1 2 3 4 5&quot;);
+  pythia.readString(&quot;HadronLevel:Decay = off&quot;);
+  pythia.readString(&quot;StringFlav:popcornRate = 0&quot;);
+  //pythia.readString(&quot;Parallelism:numThreads = 1&quot;);
+  pythia.readString(&quot;Parallelism:processAsync = on&quot;);
+  pythia.readString(&quot;VariationFrag:List = {kineVar frag:aLund=&quot;
+    + to_string(aLund) + &quot; frag:bLund=&quot; + to_string(bLund) + &quot; frag:rFactC=&quot;
+    + to_string(rFactC) + &quot; frag:rFactB=&quot; + to_string(rFactB)
+    + &quot; frag:ptSigma=&quot; + to_string(ptSigma) + &quot;}&quot;);
+
+  // Unlike flavor reweighting, the post-hoc reweighting must be
+  // turned on explicitly, even if in-situ reweighting has been
+  // enabled. This is because the information that must be stored for
+  // kinematic reweighting is substantial.
+  pythia.readString(&quot;VariationFrag:z = on&quot;);
+  pythia.readString(&quot;VariationFrag:pT = on&quot;);
+  pythia.init();
+
+  // Define the plot title.
+  string title = &quot;default: (&quot; +
+      toString(pythia.settings.parm(&quot;StringZ:aLund&quot;)) + &quot;, &quot; +
+      toString(pythia.settings.parm(&quot;StringZ:bLund&quot;)) + &quot;, &quot; +
+      toString(pythia.settings.parm(&quot;StringZ:rFactC&quot;)) + &quot;, &quot; +
+      toString(pythia.settings.parm(&quot;StringZ:rFactB&quot;)) + &quot;, &quot; +
+      toString(pythia.settings.parm(&quot;StringPT:sigma&quot;)) + &quot;), &quot; +
+      &quot;variation: (&quot; + toString(aLund) + &quot;, &quot; + toString(bLund) + &quot;, &quot; +
+      toString(rFactC) + &quot;, &quot; + toString(rFactB) + &quot;, &quot; +
+      toString(ptSigma) + &quot;) &quot;;
+
+  // Create the reweighting tool given a settings object. Here, since
+  // the parallel framework is being used, the settings from the
+  // helper Pythia object which is used to intialize the other Pythia
+  // versions is passed.
+  map&lt;int, KinematicVariations*&gt; vars;
+  pythia.foreach([&amp;](Pythia* pythiaPtr) {
+    vars[pythiaPtr-&gt;settings.mode(&quot;Parallelism:index&quot;)] =
+      new KinematicVariations(pythiaPtr-&gt;settings);
+  });
+  // Alternatively, the tool can be created by passing the default
+  // parameters.
+  // KinematicVariations vars(aLundDefault, bLundDefault,
+  //   rFactCDefault, rFactBDefault, ptSigmaDefault);
+
+  // Define multiplicity histograms.
+  // default:     the default parameters in Pythia
+  // posthoc-wgt: post-hoc reweighted using the Pythia event
+  // posthoc-str: post-hoc reweighted using the saved string break
+  // insitu:      in-situ reweighted
+  // rerun:       a run with the varied parameters
+  vector&lt;string&gt; names = {
+    &quot;default&quot;, &quot;posthoc-wgt&quot;, &quot;posthoc-str&quot;, &quot;insitu&quot;, &quot;rerun&quot;};
+  map&lt;string, Hist&gt; hists;
+  for (string &amp;name : names)
+    hists[name] = Hist(name, 25, 2, 51);
+
+  // Track the weights.
+  map&lt;string, double&gt; wgts, sumWgts, sumWgt2s;
+  for (string &amp;name : names)
+    wgts[name] = sumWgts[name] = sumWgt2s[name] = 0;
+  names.pop_back();
+
+  // This mutual exclusion (mutex) object controls access to weights
+  // and histograms.
+  mutex wgtsMutex;
+
+  // Run events.
+  int nEvent = 1e6;
+  // This defines a lambda function that acts as a callback.
+  // This function is called for each event generated.
+  // The argument is a pointer to the instance that generated the event.
+  pythia.run(nEvent, [&amp;](Pythia* pythiaPtr) {
+
+    Event &amp;event = pythiaPtr-&gt;event;
+    int idx = pythiaPtr-&gt;settings.mode(&quot;Parallelism:index&quot;);
+
+    // The necessary information for reweighting later can be saved to
+    // a string. Note, other serialization implementations can be
+    // used, and could then be implemented with symmetric
+    // KinematicVariations::read and KinematicVariations::write methods.
+    string zIntSaved = vars[idx]-&gt;write(pythiaPtr-&gt;info.weightContainerPtr
+      -&gt;weightsFragmentation.zIntBreaks);
+    string zDblSaved = vars[idx]-&gt;write(pythiaPtr-&gt;info.weightContainerPtr
+      -&gt;weightsFragmentation.zDblBreaks);
+    string pTSaved = vars[idx]-&gt;write(pythiaPtr-&gt;info.weightContainerPtr
+      -&gt;weightsFragmentation.pTBreaks);
+
+    // Calculate the weight for the event, assuming we already have
+    // the weight container and associated string breaks.
+    double wgtPH = vars[idx]-&gt;weight(aLund, bLund, rFactC, rFactB, ptSigma,
+      pythiaPtr-&gt;info.weightContainerPtr-&gt;weightsFragmentation.zIntBreaks,
+      pythiaPtr-&gt;info.weightContainerPtr-&gt;weightsFragmentation.zDblBreaks,
+      pythiaPtr-&gt;info.weightContainerPtr-&gt;weightsFragmentation.pTBreaks);
+
+    // If instead we have saved the breaks to a string, as we did
+    // above, we can calculate the weight from the saved string.
+    double wgtPHStr = vars[idx]-&gt;weight(aLund, bLund, rFactC, rFactB, ptSigma,
+      intVectorAttributeValue(zIntSaved, &quot;&quot;),
+      doubleVectorAttributeValue(zDblSaved, &quot;&quot;),
+      doubleVectorAttributeValue(pTSaved, &quot;&quot;));
+
+    // We can also use the in-situ reweighting.
+    double wgtIS = pythiaPtr-&gt;info.weightValueByIndex(
+      pythiaPtr-&gt;info.numberOfWeights() - 1);
+
+    // Lock for weights and histograms.
+    wgtsMutex.lock();
+
+    // For the default parameters, the weight is just 1.
+    wgts[&quot;default&quot;] = 1;
+    wgts[&quot;posthoc-wgt&quot;] = wgtPH;
+    wgts[&quot;posthoc-str&quot;] = wgtPHStr;
+    wgts[&quot;insitu&quot;] = wgtIS;
+
+    // Keep track of the weights.
+    for (string &amp;name : names) {
+      sumWgts[name]  += wgts[name];
+      sumWgt2s[name] += pow2(wgts[name]);
+    }
+
+    // Fill the histograms.
+    int mult = 0;
+    for (const Particle &amp;prt : event) {
+      if (!prt.isFinal()) continue;
+      if (prt.isCharged()) ++mult;
+    }
+    for (string &amp;name : names) hists[name].fill(mult, wgts[name]);
+    wgtsMutex.unlock();
+  });
+  pythia.stat();
+
+  // Rerun Pythia with the varied parameters.
+  pythia.settings.parm(&quot;StringZ:aLund&quot;,  aLund);
+  pythia.settings.parm(&quot;StringZ:bLund&quot;,  bLund);
+  pythia.settings.parm(&quot;StringZ:rFactC&quot;, rFactC);
+  pythia.settings.parm(&quot;StringZ:rFactB&quot;, rFactB);
+  pythia.settings.parm(&quot;StringPT:sigma&quot;, ptSigma);
+  pythia.settings.wvec(&quot;VariationFrag:List&quot;, {});
+  pythia.settings.flag(&quot;VariationFrag:z&quot;, false);
+  pythia.settings.flag(&quot;VariationFrag:pT&quot;, false);
+
+  // If Pythia fails to initialize, exit with error.
+  if (!pythia.init()) return 1;
+
+  pythia.run( nEvent, [&amp;](Pythia* pythiaPtr) {
+
+    Event &amp;event = pythiaPtr-&gt;event;
+    int mult = 0;
+    for (const Particle &amp;prt : event) {
+      if (!prt.isFinal()) continue;
+      if (prt.isCharged()) ++mult;
+    }
+    wgtsMutex.lock();
+    sumWgts[&quot;rerun&quot;]  += 1;
+    sumWgt2s[&quot;rerun&quot;] += 1;
+    hists[&quot;rerun&quot;].fill(mult, 1.);
+    wgtsMutex.unlock();
+  });
+  pythia.stat();
+
+  // Normalize the histograms.
+  for (auto &amp;hist : hists) hist.second /= sumWgts[hist.first];
+
+  // Print the histogram ratios.
+  string xlabel = &quot;multiplicity&quot;;
+  for (auto &amp;hist : hists)
+    cout &lt;&lt; &quot;\n&quot; &lt;&lt; hist.first &lt;&lt; hist.second/hists[&quot;default&quot;];
+
+  // Print the reweighting stats.
+  // The 1 - mu should be statistically consistent with zero if the
+  // reweighting has proper coverage.
+  // The n_eff gives the statistical power of the reweighted sample.
+  for (string &amp;name : names) {
+    double w(sumWgts[name]), w2(sumWgt2s[name]), n(sumWgts[&quot;default&quot;]);
+    cout &lt;&lt; name &lt;&lt; &quot;\n&quot;
+         &lt;&lt; &quot;\t1 - mu = &quot; &lt;&lt; scientific &lt;&lt; setprecision(3) &lt;&lt; abs(1. - w/n)
+         &lt;&lt; &quot; +- &quot;&lt;&lt; abs(1. - sqrt((w2/n - pow2(w/n))*n/(n - 1)))/sqrt(n)
+         &lt;&lt; &quot;\n\tn_eff  = &quot; &lt;&lt; scientific &lt;&lt; setprecision(3) &lt;&lt; w/sqrt(n*w2)
+         &lt;&lt; &quot;\n&quot;;
+  }
+
+  // Create Python plot.
+  HistPlot hpl(&quot;plot265&quot;);
+  hpl.frame(&quot;fig265&quot;, title, xlabel, &quot;n(variation)/n(default)&quot;);
+  for (string &amp;name : names)
+    hpl.add(hists[name]/hists[&quot;default&quot;], &quot;e&quot;, name);
+  hpl.add(hists[&quot;rerun&quot;]/hists[&quot;default&quot;], &quot;e&quot;, &quot;rerun&quot;);
+  hpl.plot();
+
+  // Clean up the memory.
+  for (auto var : vars) {
+    delete var.second;
+  }
+
+  return 0;
+}
+</code></pre></body></html>

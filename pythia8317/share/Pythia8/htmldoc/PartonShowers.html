@@ -1,0 +1,119 @@
+<html>
+<head>
+<title>Parton Showers</title>
+<link rel="stylesheet" type="text/css" href="pythia.css"/>
+<link rel="shortcut icon" href="pythia32.gif"/>
+</head>
+<body>
+ 
+<h2>Parton Showers</h2> 
+ 
+<a name="section0"></a> 
+<h3>Shower Model Selection</h3> 
+ 
+As of version 8.301, PYTHIA integrates different complete 
+parton-shower frameworks: the original "simple" showers, the VINCIA 
+antenna showers and the Dire dipole showers. Thereby comparisons between 
+different shower approaches become easier. 
+Starting with version 8.316, the Dire dipole shower has been retired 
+and will no longer be actively supported. 
+ 
+<p/> 
+Since early days PYTHIA 8 has allowed external shower programs 
+to be linked, thereby replacing the internal simple ones, see the 
+<a href="ImplementNewShowers.html" target="page">Implement New Showers</a> page. 
+The VINCIA code originally was structured to make use of this 
+functionality, but was developed and distributed as separate code. 
+Starting with version 8.300, VINCIA is now fully integrated into 
+the PYTHIA distribution, and appears on equal footing with the old 
+simple showers. Which of the internal shower frameworks 
+that will be used in a run is determined by the following switch. 
+ 
+<a name="anchor1"></a>
+<p/><code>mode&nbsp; </code><strong> PartonShowers:model &nbsp;</strong> 
+ (<code>default = <strong>1</strong></code>; <code>minimum = 1</code>; <code>maximum = 2</code>)<br/>
+Choice of which shower machinery that will be used in PYTHIA (when not 
+linking an external shower). 
+<br/><code>option </code><strong> 1</strong> : <a href="SimpleShowers.html" target="page">Simple Showers</a>. 
+This is the "old" shower framework that has its roots in PYTHIA 6 and 
+has been distributed with PYTHIA 8 since the beginning. It is a less 
+ambitious project than the other two, but for that reason also more 
+mature and stable, which is a reason why it for now remains as default. 
+It also has some special features that the other two don't. 
+   
+<br/><code>option </code><strong> 2</strong> : <a href="Vincia.html" target="page">VINCIA Showers</a>. Based on 
+sequences of pT-ordered 2&rarr;3 branchings, the VINCIA shower model 
+is similar to that of ARIADNE, which it resembles strongly for 
+final-state evolution while VINCIA adopts a different 
+(backwards-evolution) picture for initial-state radiation. The 
+branching kernels, known as antenna functions, treat coherent sums of 
+parton pairs without requiring a separation into "radiators" and 
+"spectators". The current PYTHIA implementation includes QCD and QED 
+2&rarr;3 branchings with full mass dependence and, for the latter, 
+multipole interference effects. An option for EW showers is also 
+available, based on collinear splitting kernels. A few longstanding 
+hallmarks of VINCIA, such as automated uncertainty variations and 
+(iterated) matrix-element corrections, are not yet available in this 
+version. 
+   
+<br/>Further webpages, as linked above (and in the Parton Showers 
+section of the left-column index), provide more detailed information 
+on the respective framework. 
+   
+ 
+<p/> 
+There are some differences between the showers to be aware of 
+<ul> 
+<li>While both shower models do ordinary QCD and QED radiation, 
+beyond that the capabilities vary.</li> 
+<li>Tuned parameter values for PYTHIA's modeling of 
+nonperturbative physics are normally only valid for 
+the specific shower model they were tuned with, 
+due to differences in perturbative regularisations between the 
+three shower models and a nontrivial 
+interplay between perturbative and nonperturbative physics modeling 
+in general. VINCIA therefore comes with their own dedicated default tune 
+parameters which are activated in different ways, see the respective 
+documentation pages.</li> 
+<li>As mentioned above, some of the hallmark features of VINCIA during 
+its standalone development have not yet been carried over to the 
+PYTHIA implementation. This includes (iterated) matrix-element 
+corrections, tree-level 2&rarr;4 branchings and NLO-corrected 2&rarr; 
+3 ones, automated uncertainty variations, and the ROOT-based 
+<code>LiveDisplays</code> tool for live histogram displays.  This is 
+work in progress and we expect most of these features to reappear in 
+future releases of PYTHIA 8.3.</li> 
+</ul> 
+ 
+<a name="section1"></a> 
+<h3>Some details</h3> 
+ 
+Originally the <code>TimeShower</code> and <code>SpaceShower</code> 
+classes implemented the simple shower, but also acted as base classes 
+from which the external showers derived. This had some disadvantages 
+for the purpose of the tighter integration of VINCIA. 
+The <code>TimeShower</code> and 
+<code>SpaceShower</code> classes remain as bare-bones base classes, 
+from which the actual showers are derived. The code for the simple 
+showers has been moved to the new derived <code>SimpleTimeShower</code> 
+and <code>SimpleSpaceShower</code>. An external shower that does not 
+use any of the existing shower algorithms will therefore work as before, 
+which would be the normal case, but alternatively a shower could derive 
+from the new classes and then reuse relevant code in them. 
+ 
+<p/> 
+Settings names for the simple shower have been retained through this 
+transformation, again for reasons of backwards compatibility of user 
+code, e.g. in command files. Thus setting names beginning with 
+<code>TimeShower:</code>, <code>SpaceShower:</code>, 
+<code>WeakShower:</code> or <code>UncertaintyBands:</code> refer 
+to the current baseline "simple" showers, and so do the 
+<code>HiddenValley:</code> shower-related settings. 
+As a rule, the corresponding VINCIA settings begin with 
+<code>Vincia:</code>. A few of the simple shower settings also 
+apply to the other two, as documented on the respective page. 
+It is possible that future evolution will standardize some settings, 
+while others will be more clearly separated. 
+ 
+</body>
+</html>

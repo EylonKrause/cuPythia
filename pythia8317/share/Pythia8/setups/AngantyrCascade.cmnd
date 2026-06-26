@@ -1,0 +1,40 @@
+! This file provides the preferred setting for Angantyr for use in a
+! hadronic air shower.
+
+! Frst we read in all necessary initialisation files.
+include = setups/InitDefaultAngantyr.cmnd
+
+! Tell Pythia to use Anganty also for hadron-hadron collisions.
+HeavyIon:mode = 2
+
+! Switch on all soft QCD processes for both high and low energies.
+SoftQCD:all = on
+LowEnergyQCD:all = on
+
+! Instruct Angantyr to sample impact parametes in a way such that we
+! get events with unit weights.
+HeavyIon:forceUnitWeight = on
+
+! Tell Angantyr to go into cascade mode, where each call to next()
+! that returns false is interpreted not as a failure, but that the
+! surrounding veto algorithm should continue to propagate the current
+! particle further to obtained the correct cross section.
+Angantyr:cascadeMode = on
+
+! Special procedure of determining which collisions occur in the Glauber
+! calculation.
+Angantyr:CollisionModel = 6
+Angantyr:elasticMode = 0
+Angantyr:impactFudge = 0.9
+
+! Below which CM energy should Anganty go into low-energy mode.
+HeavyIon:eCMLowEnergy = 10
+
+! This is the new way of generating secondary non-diffractive sub
+! events.
+Angantyr:SASDmode = -1
+Angantyr:epsilonSABS = -0.04
+
+! To save CPU time we cash and reuse the Woods-Saxon generated nuclon
+! positions for each nuclei.
+HeavyIon:WScacheSize = 10000

@@ -1,0 +1,200 @@
+<html>
+<head>
+<title>RIVET usage</title>
+<link rel="stylesheet" type="text/css" href="pythia.css"/>
+<link rel="shortcut icon" href="pythia32.gif"/>
+</head>
+<body>
+ 
+<h2>RIVET usage</h2> 
+<ol id="toc">
+  <li><a href="#section0">PYTHIA with RIVET via plugin</a></li>
+  <li><a href="#section1">Using PYTHIA with RIVET via HEPMC</a></li>
+  <li><a href="#section2">Compiling PYTHIA with RIVET</a></li>
+</ol>
+
+ 
+<a href="https://rivet.hepforge.org/">RIVET</a> is a toolkit for 
+the validation of Monte Carlo event generators [<a href="Bibliography.html#refBuc10" target="page">Buc10</a>]. It 
+contains the results of many experimental analyses, so that generator 
+output can easily be compared to data, as well as providing a framework to 
+implement your own analyses. Although using PYTHIA with RIVET is not 
+officially supported, some helpful hints are given below. The full RIVET 
+manual is available <a href="https://arxiv.org/abs/1003.0694">online</a>. 
+ 
+<a name="section0"></a> 
+<h3>PYTHIA with RIVET via plugin</h3> 
+ 
+A PYTHIA plugin is available, <code>RivetHooks</code> defined in 
+<code>Pythia8Plugins/RivetHooks.h</code>. This plugin can be loaded, 
+and analyses can then be easily added for processing. The plugin works with 
+<code>PythiaParallel</code>, and RIVET analyses can be run asynchronously. 
+For the plugin to be available, PYTHIA must be configured with the 
+<code>--with-rivet</code> flag before being built. 
+<pre> 
+  ./configure --with-rivet 
+</pre> 
+If successful, the plugin library <code>lib/pythia8rivet.so</code> 
+will be built. This requires the RIVET configuration to be available via the 
+<code>rivet-config</code> command and is only available for RIVET 4. 
+ 
+<p/>There are a number of examples which show how to work with this 
+plugin: <code>main144</code>, <code>main164</code>, 
+<code>main225</code>, and <code>main421</code>. The general usage is 
+as follows. First, load the plugin. 
+<pre> 
+  Init:plugins = {libpythia8rivet.so::RivetHooks} 
+</pre> 
+None of the options described below is available if the plugin is not 
+successfully loaded. Once the plugin is loaded, a number of additional 
+settings will be available. To begin, set the output YODA file name; 
+it must end in <code>.yoda</code> (this is a RIVET requirement, not 
+PYTHIA). 
+<pre> 
+  Rivet:fileName = NAME 
+</pre> 
+If directory structure is included in the YODA file name, an attempt 
+will be made to create that directory structure. 
+ 
+<p/>Next, define the analyses to run. This can be done with comma 
+separated lists, <code>{ANALYSIS1,ANALYSIS2,ANALYSIS3,...}</code>. The 
+list of analyses can be appended with the <code>+=</code> syntax. 
+<pre> 
+  Rivet:analyses  = {ANALYSIS1,ANALYSIS2} 
+  Rivet:analyses += {ANALYSIS3} 
+</pre> 
+Parameters for each analysis can be modified using the following syntax. 
+<pre> 
+  Rivet:analyses = {ANALYSIS1:PARM1=VALUE1:PARM2=VALUE2:...,ANALYSIS2} 
+</pre> 
+ 
+Finally, set any additional configuration for RIVET. 
+<pre> 
+  ! This is a list of YODA files which can be preloaded. 
+  Rivet:preloads = {YODA1,YODA2,YODA3,...} 
+  ! This is a temporary debugging output filename, which must end with .yoda. 
+  Rivet:dumpName = NAME 
+  ! If NUMBER > 0, dump RIVET output to Rivet:dumpName every NUMBER events. 
+  Rivet:dumpPeriod = NUMBER 
+  ! Flag to require RIVET to check the beam configuration. 
+  Rivet:checkBeams = off 
+  ! By default, zero weight events are skipped for analysis. 
+  Rivet:skipZeroWeights = on 
+</pre> 
+ 
+<a name="section1"></a> 
+<h3>Using PYTHIA with RIVET via HEPMC</h3> 
+The following assumes that you already have RIVET installed. Instructions 
+for this may be found 
+<a href="https://gitlab.com/hepcedar/rivet/-/blob/main/README.md?ref_type=heads#getting-started"> 
+here</a>. 
+ 
+<br/><br/> 
+Events are passed from PYTHIA to RIVET using the HepMC format. PYTHIA must 
+be compiled with HepMC support, using the same version of HepMC used when 
+compiling RIVET. This is setup through the PYTHIA <code>configure</code> 
+script e.g. 
+<pre> 
+  ./configure --with-hepmc=/path/to/HepMC 
+ 
+</pre> 
+The PYTHIA library itself does not need to be recompiled. 
+ 
+<br/><br/> 
+The <code>examples/main132.cc</code> sample program can then be used to 
+generate events in HepMC format (which <code>examples/main133.cc</code> 
+extends by allowing subruns). When in the <code>examples</code> directory, 
+the main program can be built and used as follows 
+<pre> 
+  make main132 
+  ./main132 main132.cmnd main132.hepmc 
+ 
+</pre> 
+The first argument is the input file which provides the options for event 
+generation, while the second is the output file where the HepMC events 
+should be written. 
+ 
+<br/><br/> 
+This HepMC file may now be read and processed by RIVET 
+<pre> 
+  rivet --analysis=ANALYSIS_NAME main132.hepmc 
+ 
+</pre> 
+where <code>ANALYSIS_NAME</code> is a 
+<a href="https://rivet.hepforge.org/analyses/">built-in RIVET 
+analysis</a>, or one you have created yourself. The output of RIVET is in 
+the form of <code>.aida</code> files, containing the histograms for the 
+analysis, which can be processed further with RIVET (see the 
+<a href="https://gitlab.com/hepcedar/rivet/tree/release-4-1-x#getting-started"> 
+RIVET documentation</a> for more details). 
+ 
+<br/><br/> 
+The above examples requires that (potentially large) HepMC events are stored 
+to disk before being read by RIVET. It is possible, instead, to pass the 
+events directly to RIVET as they are produced by using a <code>FIFO</code> 
+pipe. This is done with the <code>mkfifo</code> command 
+<pre> 
+  mkfifo my_fifo 
+  ./main132.exe main132.cmnd my_fifo & 
+  rivet --analysis=ANALYSIS_NAME my_fifo 
+ 
+</pre> 
+Note that <code>main132</code> is run in the background. 
+ 
+<a name="section2"></a> 
+<h3>Compiling PYTHIA with RIVET</h3> 
+ 
+It is also possible to compile a PYTHIA main program together with the 
+RIVET library. To facilitate this, there is a header file called 
+<code>Pythia8Plugins/Pythia8Rivet.h</code> defining a helper class 
+called <code>Pythia8::Pythia8Rivet</code>. This header class has been 
+deprecated in favor of the plugin structure above, and will be removed 
+in a future version of PYTHIA. To use this class, a main program needs 
+to be modified as follows: 
+<pre> 
+  #include "Pythia8/Pythia.h" 
+ 
+  // Include the Pythia8Rivet header file. 
+  #include "Pythia8Plugins/Pythia8Rivet.h" 
+ 
+  int main() { 
+ 
+    Pythia pythia; 
+ 
+    // Setup the run by reading strings or a command file. 
+ 
+    pythia.init(); 
+ 
+    // Create a Pythia8Rivet object and add (one or several) analyses. 
+ 
+    Pythia8Rivet rivet(pythia, "outputfile.yoda"); 
+    rivet.addAnalysis("AnalysisName"); 
+    rivet.addAnalysis("AnotherAnalysisName"); 
+ 
+    for (int iEvent = 0; iEvent &lt; 100; ++iEvent) { 
+      if (!pythia.next()) continue; 
+ 
+      // Push event to Rivet. 
+      rivet(); 
+ 
+      // Maybe do other non-Rivet analysis. 
+    } 
+ 
+    // Tell Rivet to finalise the run. 
+    rivet.done(); 
+ 
+  } 
+ 
+</pre> 
+To compile the program, information about where Rivet and its 
+dependencies are installed is needed. This information is available 
+via the <code>rivet-config</code> script via the following. 
+<pre> 
+  rivet-config --includedir --libdir --cppflags --libs 
+ 
+</pre> 
+ 
+</body>
+</html>
+ 
+<!-- Copyright (C) 2026 Torbjorn Sjostrand --> 

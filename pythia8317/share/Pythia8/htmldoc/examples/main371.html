@@ -1,0 +1,301 @@
+<html><head><title>main371</title>
+<link rel="stylesheet" type="text/css" href="../pythia.css"/>
+<link rel="shortcut icon" href="../pythia32.gif"/></head><body><h2>main371</h2>
+Back to <a href="../ExampleKeywords.html" target="page">index.</a>
+<pre><code class="language-c++">
+// main371.cc is a part of the PYTHIA event generator.
+// Copyright (C) 2026 Torbjorn Sjostrand.
+// PYTHIA is licenced under the GNU GPL v2 or later, see COPYING for details.
+// Please respect the MCnet Guidelines, see GUIDELINES for details.
+
+// Authors:
+//            <a href="mailto:torbjorn.sjostrand@fysik.lu.se">Torbjorn Sjostrand</a>
+
+// Keywords:
+//            <a href="../ExampleKeywords.html#top">Top</a>
+//            <a href="../ExampleKeywords.html#toponium">Toponium</a>
+
+// Study ttbar production above and below threshold,
+// starting out from the equations in
+// V. Fadin,  V. Khoze and T. Sjostrand, Z. Phys. C48 (1990) 613,
+// with some further assumptions in the below-threshold simulation.
+
+#include &quot;Pythia8/Pythia.h&quot;
+using namespace Pythia8;
+
+//============================================================================
+
+int main() {
+
+  // Restrict to threshold region only or not.
+  bool thresholdOnly = true;
+
+  // Full event generation or only cross-section-oriented studies.
+  bool fullEvents = false;
+
+  // Number of events.
+  int nEvent = 1000000;
+
+  // LHC collision energy.
+  double eCM = 13000.;
+
+  // Example of possible setup values.
+  // topModelSetup = 0 is Born, = 1 is simple Coulomb, = 2 is Green&apos;s,
+  // = 3 is reduced top quark width, = 4 reduced width in cross section.
+  int    topModelSetup   = 3;
+
+  // Suitable values for given topModelSetup.
+  int    topModel        = min( topModelSetup, 2);
+  double mt              = 172.5;
+  double gammat          = (topModelSetup != 3) ? 1.34 : 0.1;
+  // Warning:  a small gammatGreen may lead to event weights above unity.
+  double gammatGreen     = (topModelSetup != 4) ? 1.34 : 0.2;
+  double thresholdRegion = 10.;
+  int    alphasOrder     = 2;
+  double alphasValue     = 0.118;
+  double ggSingletFrac   = 2./7.;
+  double qqSingletFrac   = 0.;
+  bool   pseudoscalar    = true;
+  double eBegDamp        = 10.;
+  double eEndDamp        = 20.;
+
+  // Generator.
+  Pythia pythia;
+
+  // Process selection. LHC at 13 TeV.
+  pythia.readString(&quot;Top:gg2ttbar = on&quot;);
+  pythia.readString(&quot;Top:qqbar2ttbar = on&quot;);
+  pythia.settings.parm(&quot;Beams:eCM&quot;, eCM);
+
+  // Restrict to threshold region or not.
+  if (thresholdOnly) {
+    pythia.readString(&quot;PhaseSpace:mHatMin = 300.&quot;);
+    pythia.readString(&quot;PhaseSpace:mHatMax = 400.&quot;);
+  }
+  else pythia.readString(&quot;PhaseSpace:mHatMin = 200.&quot;);
+
+  // Feed in desired values.
+  pythia.settings.mode(&quot;TopThreshold:model&quot;, topModel);
+  pythia.particleData.m0(6, mt);
+  pythia.readString(&quot;6:doForceWidth = true&quot;);
+  pythia.particleData.mWidth( 6, gammat);
+  pythia.settings.parm(&quot;TopThreshold:tWidthGreen&quot;, gammatGreen);
+  pythia.settings.parm(&quot;TopThreshold:thrRegion&quot;, thresholdRegion);
+  pythia.settings.mode(&quot;TopThreshold:alphasOrder&quot;, alphasOrder);
+  pythia.settings.parm(&quot;TopThreshold:alphasValue&quot;, alphasValue);
+  pythia.settings.parm(&quot;TopThreshold:ggSingletFrac&quot;, ggSingletFrac);
+  pythia.settings.parm(&quot;TopThreshold:qqSingletFrac&quot;, qqSingletFrac);
+  pythia.settings.flag(&quot;TopThreshold:pseudoscalar&quot;, pseudoscalar);
+  pythia.settings.parm(&quot;TopThreshold:psEBeginDamp&quot;, eBegDamp);
+  pythia.settings.parm(&quot;TopThreshold:psEEndDamp&quot;, eEndDamp);
+
+  // Switch off (most) code parts not relevant here. Reduce printout.
+  if (!fullEvents) {
+    pythia.readString(&quot;PartonLevel:ISR = off&quot;);
+    pythia.readString(&quot;PartonLevel:FSR = off&quot;);
+    pythia.readString(&quot;PartonLevel:MPI = off&quot;);
+    pythia.readString(&quot;HadronLevel:all = off&quot;);
+  }
+  pythia.readString(&quot;Next:numberCount = 100000&quot;);
+
+  // If Pythia fails to initialize, exit with error.
+  if (!pythia.init()) return 1;
+
+  // Histograms.
+  Hist mHatOri(&quot;original threshold&quot;, 100, -20., 80.);
+  Hist mHatOriLow(&quot;original threshold&quot;, 100, -10., 30.);
+  Hist mHatThr(&quot;corrected threshold&quot;, 100, -20., 80.);
+  Hist mHatLow(&quot;ttbar invariant mass, low&quot;, 100, 300., 400.);
+  Hist mHatAll(&quot;ttbar invariant mass, all&quot;, 100, 200., 1200.);
+  Hist mTopMax(&quot;max(m_t, m_tbar) mass distribution&quot;, 100, 100., 200.);
+  Hist mTopMin(&quot;min(m_t, m_tbar) mass distribution&quot;, 100, 100., 200.);
+  Hist betaPair(&quot;beta factor of pair&quot;, 100, 0., 1.);
+  Hist mHatOriBT(&quot;original threshold, below&quot;, 100, -20., 80.);
+  Hist mHatOriBTLow(&quot;original threshold, below&quot;, 100, -10., 30.);
+  Hist mHatThrBT(&quot;corrected threshold, below&quot;, 100, -10., 30.);
+  Hist mHatLowBT(&quot;ttbar invariant mass, low, below&quot;, 100, 300., 400.);
+  Hist mHatAllBT(&quot;ttbar invariant mass, all, below&quot;, 100, 200., 1200.);
+  Hist mTopMaxBT(&quot;max(m_t, m_tbar) mass distribution, below&quot;, 100, 100., 200.);
+  Hist mTopMinBT(&quot;min(m_t, m_tbar) mass distribution, below&quot;, 100, 100., 200.);
+  Hist betaPairBT(&quot;beta factor of pair, below&quot;, 100, 0., 1.);
+  Hist mShiftBT(&quot;shift in top mass, after - before&quot;, 100, -45., 5.);
+
+  // Counters. Real numbers since some events can come with weights &gt; 1.
+  double nEventEff = 0., nBelow2mt = 0., nBelow = 0., nBelowgg = 0.,
+    nBelowqq = 0., nAbovegg = 0., nAboveqq = 0., eBelow = 0.;
+
+  // Begin event loop.
+  for (int iEvent = 0; iEvent &lt; nEvent; ++iEvent) {
+
+    // Generate events.
+    if (!pythia.next()) continue;
+    double wt   = pythia.info.weight();
+
+    // Original threshold value and other properties.
+    double eThr = pythia.info.toponiumE;
+    double mt1T = pythia.info.toponiumm3;
+    double mt2T = pythia.info.toponiumm4;
+    double mHat = pythia.info.mHat();
+    double mt1  = pythia.info.m3Hat();
+    double mt2  = pythia.info.m4Hat();
+    double rat1 = pow2( mt1 / mHat);
+    double rat2 = pow2( mt2 / mHat);
+    double beta = sqrtpos( pow2(1 - rat1 - rat2) - 4. * rat1 * rat2);
+
+    // Histogram for all events.
+    mHatOri.fill( eThr, wt);
+    mHatOriLow.fill( eThr, wt);
+    mHatThr.fill( mHat - mt1 - mt2, wt);
+    mHatLow.fill( mHat, wt);
+    mHatAll.fill( mHat, wt);
+    mTopMax.fill( max(mt1,mt2), wt);
+    mTopMin.fill( min(mt1,mt2), wt);
+    betaPair.fill( beta, wt);
+
+    // Histogram for below-threshold events (and some above).
+    nEventEff += wt;
+    if (mHat &lt; 2. * mt) nBelow2mt += wt;
+    if (eThr &lt; 0.) {
+      nBelow += wt;
+      if (pythia.info.code() == 601) nBelowgg += wt;
+      else nBelowqq += wt;
+      eBelow += eThr * wt;
+      mHatOriBT.fill( eThr, wt);
+      mHatOriBTLow.fill( eThr, wt);
+      mHatThrBT.fill( mHat - mt1 - mt2, wt);
+      mHatLowBT.fill( mHat, wt);
+      mHatAllBT.fill( mHat, wt);
+      mTopMaxBT.fill( max(mt1,mt2), wt);
+      mTopMinBT.fill( min(mt1,mt2), wt);
+      betaPairBT.fill( beta, wt);
+      mShiftBT.fill( mt1 - mt1T, wt);
+      mShiftBT.fill( mt2 - mt2T, wt);
+    } else {
+      if (pythia.info.code() == 601) nAbovegg += wt;
+      else nAboveqq += wt;
+    }
+
+  // End of event loop.
+  }
+
+  // Normalize histogram to cross section, in pb/GeV.
+  double sigmaGen = 1e9 * pythia.info.sigmaGen();
+  double sigmapb = sigmaGen  / nEventEff;
+  mHatOri      *= sigmapb;
+  mHatOriLow   *= 2.5 * sigmapb;
+  mHatThr      *= sigmapb;
+  mHatLow      *= sigmapb;
+  mHatAll      *= 0.1 * sigmapb;
+  mTopMax      *= sigmapb;
+  mTopMin      *= sigmapb;
+  betaPair     *= 100. * sigmapb;
+  mHatOriBT    *= sigmapb;
+  mHatOriBTLow *= 2.5 * sigmapb;
+  mHatThrBT    *= sigmapb;
+  mHatLowBT    *= sigmapb;
+  mHatAllBT    *= 0.1 * sigmapb;
+  mTopMaxBT    *= sigmapb;
+  mTopMinBT    *= sigmapb;
+  betaPairBT   *= 100. * sigmapb;
+  mShiftBT     *= 2. * sigmapb;
+
+  // Statistics and cross sections
+  pythia.stat();
+  double sigma2mt = sigmapb * nBelow2mt;
+  double sigAbv   = sigmapb * (nEventEff - nBelow);
+  double sigAbvgg = sigmapb * nAbovegg;
+  double sigAbvqq = sigmapb * nAboveqq;
+  double sigBel   = sigmapb * nBelow;
+  double sigBelgg = sigmapb * nBelowgg;
+  double sigBelqq = sigmapb * nBelowqq;
+  cout &lt;&lt; &quot;\n total sigma in studied region = &quot; &lt;&lt; fixed &lt;&lt; setprecision(3)
+       &lt;&lt; sigmaGen &lt;&lt; &quot; pb whereof below 2 mt = &quot; &lt;&lt; sigma2mt &lt;&lt; &quot; pb&quot;
+       &lt;&lt; endl &lt;&lt; &quot; sigma above threshold = &quot;  &lt;&lt; sigAbv &lt;&lt; &quot; pb&quot; &lt;&lt; endl
+       &lt;&lt; &quot;   whereof gg = &quot; &lt;&lt; sigAbvgg &lt;&lt; &quot; pb and qq = &quot; &lt;&lt; sigAbvqq
+       &lt;&lt; &quot; pb&quot; &lt;&lt; endl &lt;&lt; &quot; sigma below threshold = &quot; &lt;&lt; sigBel
+       &lt;&lt; &quot; pb&quot; &lt;&lt; endl &lt;&lt; &quot;   whereof gg = &quot; &lt;&lt; sigBelgg &lt;&lt; &quot; pb and qq = &quot;
+       &lt;&lt; sigBelqq &lt;&lt; &quot; pb&quot; &lt;&lt; endl;
+  eBelow /= max(1., nBelow);
+  cout &lt;&lt; &quot; average energy for below-threshold part = &quot; &lt;&lt; eBelow
+       &lt;&lt; &quot; GeV&quot; &lt;&lt; endl;
+
+  // Histograms with pyplot.
+  HistPlot hpl(&quot;plot371&quot;);
+  bool doOptional = true;
+
+  // Spectra relative to event-by-event threshold, including below.
+  hpl.frame(&quot;fig371&quot;, &quot;Energy above/below threshold, original tops&quot;,
+    &quot;$E$ (GeV)&quot;, &quot;$\\mathrm{d}\\sigma/\\mathrm{d}E$ (pb/GeV)&quot;);
+  hpl.add( mHatOri - mHatOriBT, &quot;h,black&quot;, &quot;above-threshold part&quot;);
+  hpl.add( mHatOriBT, &quot;h,red&quot;, &quot;below-threshold part&quot;);
+  hpl.plot();
+
+  // Ditto, but with new t/tbar masses for below-threshold part.
+  hpl.frame(&quot;&quot;, &quot;Energy above threshold, new top masses where necessary&quot;,
+    &quot;$E&apos;$ (GeV)&quot;, &quot;$\\mathrm{d}\\sigma/\\mathrm{d}E&apos;$ (pb/GeV)&quot;);
+  hpl.add( mHatThr, &quot;h,black&quot;, &quot;all&quot;);
+  hpl.add( mHatThrBT, &quot;h,red&quot;, &quot;below-threshold part&quot;);
+  hpl.plot();
+
+  // Pair mass spectra close to threshold.
+  hpl.frame(&quot;&quot;, &quot;Invariant mass of ttbar pair, near threshold&quot;,
+    &quot;$m(t+tbar) (GeV)$&quot;, &quot;$\\mathrm{d}\\sigma/\\mathrm{d}m$ (pb/GeV)&quot;);
+  hpl.add( mHatLow, &quot;h,black&quot;, &quot;all&quot;);
+  hpl.add( mHatLowBT, &quot;h,red&quot;, &quot;below-threshold part&quot;);
+  hpl.plot();
+
+  // Pair mass spectra over full range.
+  hpl.frame(&quot;&quot;, &quot;Invariant mass of ttbar pair, full range&quot;,
+    &quot;$m(t+tbar) (GeV)$&quot;, &quot;$\\mathrm{d}\\sigma/\\mathrm{d}m$ (pb/GeV)&quot;);
+  hpl.add( mHatAll, &quot;h,black&quot;, &quot;all&quot;);
+  hpl.add( mHatAllBT, &quot;h,red&quot;, &quot;below-threshold part&quot;);
+  hpl.plot();
+
+  // Top/antitop mass spectra.
+  hpl.frame(&quot;&quot;, &quot;Larger of top and antitop masses&quot;,
+    &quot;max($m(t), m(tbar)$) (GeV)&quot;, &quot;$\\mathrm{d}\\sigma/\\mathrm{d}m$ &quot;
+    &quot;(pb/GeV)&quot;);
+  hpl.add( mTopMax, &quot;h,black&quot;, &quot;all&quot;);
+  hpl.add( mTopMaxBT, &quot;h,red&quot;, &quot;below-threshold part&quot;);
+  hpl.plot(100., 200., 0.01, 100., true, false);
+
+  hpl.frame(&quot;&quot;, &quot;Smaller of top and antitop masses&quot;,
+    &quot;min($m(t), m(tbar)$) (GeV)&quot;, &quot;$\\mathrm{d}\\sigma/\\mathrm{d}m$ &quot;
+    &quot;(pb/GeV)&quot;);
+  hpl.add( mTopMin, &quot;h,black&quot;, &quot;all&quot;);
+  hpl.add( mTopMinBT, &quot;h,red&quot;, &quot;below-threshold part&quot;);
+  hpl.plot(100., 200., 0.01, 100., true, false);
+
+  // Top/antitop separation.
+  hpl.frame(&quot;&quot;, &quot;Beta factor in t-tbar pair&quot;,
+    &quot;$\\beta$&quot;, &quot;$\\mathrm{d}\\sigma/\\mathrm{d}\\beta$ (pb)&quot;);
+  hpl.add( betaPair, &quot;h,black&quot;, &quot;all&quot;);
+  hpl.add( betaPairBT, &quot;h,red&quot;, &quot;below-threshold part&quot;);
+  hpl.plot();
+
+  // Redefinition change of top masses in below-threshold pairs.
+  hpl.frame(&quot;&quot;, &quot;Shift of below-threshold top masses&quot;, &quot;$\\Delta m$ (GeV)&quot;,
+    &quot;$\\mathrm{d}\\sigma/\\mathrm{d}(\\Delta m)$ (pb/GeV)&quot;);
+  hpl.add( mShiftBT, &quot;h,red&quot;, &quot;below-threshold part&quot;);
+  hpl.plot();
+
+  // For inclusion in talk.
+  if (doOptional) {
+    hpl.frame(&quot;fig371mass&quot;, &quot;&quot;, &quot;$\\hat{m}$ (GeV)&quot;,
+      &quot;$\\mathrm{d}\\sigma/\\mathrm{d}\\hat{m}$ (pb/GeV)&quot;, 4.8, 4.8);
+    hpl.add( mHatLowBT, &quot;h,red&quot;, &quot;below threshold&quot;);
+    hpl.add( mHatLow, &quot;h,black&quot;, &quot;all&quot;);
+    hpl.plot();
+    hpl.frame(&quot;fig371BreitWigners&quot;, &quot;&quot;, &quot;$m$ (GeV)&quot;,
+      &quot;$\\mathrm{d}\\sigma/\\mathrm{d}m$ (pb/GeV)&quot;, 4.8, 4.8);
+    hpl.add( mTopMax, &quot;h,black&quot;, &quot;max($m_{t1},m_{t2}$) all&quot;);
+    hpl.add( mTopMin, &quot;h,blue&quot;, &quot;min($m_{t1},m_{t2}$) all&quot;);
+    hpl.add( mTopMaxBT, &quot;h,red&quot;, &quot;max($m_{t1},m_{t2}$) below threshold&quot;);
+    hpl.add( mTopMinBT, &quot;h,magenta&quot;, &quot;min($m_{t1},m_{t2}$) below threshold&quot;);
+    hpl.plot(140., 200., 0.01, 1000., true, false);
+  }
+
+  // Done.
+  return 0;
+}
+</code></pre></body></html>

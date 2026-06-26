@@ -1,0 +1,99 @@
+<html>
+<head>
+<title>PTSelection</title>
+<link rel="stylesheet" type="text/css" href="pythia.css"/>
+<link rel="shortcut icon" href="pythia32.gif"/>
+</head>
+<body>
+ 
+<h2>pT Selection</h2> 
+ 
+The <code>StringPT</code> class handles the choice of fragmentation 
+transverse momentum <i>pT</i>. At each string breaking the quark 
+and antiquark of the produced pair, or the diquark and antidiquark, 
+are supposed to receive opposite and compensating <i>pT</i> kicks. 
+How they are distributed depends on the following flag: 
+ 
+<p/> 
+In more detail, the quarks receive <i>pT</i> kicks according to a 
+Gaussian distribution in <i>p_x</i> and <i>p_y</i> separately. 
+Call <i>sigma_q</i> the width of the <i>p_x</i> and  <i>p_y</i> 
+distributions separately, i.e. 
+<br/><i> 
+    d(Prob) = exp( -(p_x^2 + p_y^2) / 2 sigma_q^2). 
+</i><br/> 
+Then the total squared width is 
+<br/><i> 
+    &lt;pT^2> = &lt;p_x^2> +  &lt;p_y^2> = 2 sigma_q^2 = sigma^2. 
+</i><br/> 
+It is this latter number that is stored in 
+ 
+<a name="anchor1"></a>
+<p/><code>parm&nbsp; </code><strong> StringPT:sigma &nbsp;</strong> 
+ (<code>default = <strong>0.335</strong></code>; <code>minimum = 0.0</code>; <code>maximum = 1.0</code>)<br/>
+the width <i>sigma</i> in the fragmentation process. 
+   
+ 
+<p/> 
+Since a normal hadron receives <i>pT</i> contributions for two string 
+breakings, it has a 
+<br/><i> 
+    &lt;p_x^2>_had = &lt;p_y^2>_had = sigma^2, 
+</i><br/> 
+and thus <i>&lt;pT^2>_had = 2 sigma^2</i>. 
+ 
+<p/> 
+Some studies on isolated particles at LEP has indicated the need for 
+a slightly enhanced rate in the high-<i>pT</i> tail of the above 
+distribution. This would have to be reviewed in the context of a 
+complete retune of parton showers and hadronization, but for the 
+moment we stay with the current recipe, to boost the above <i>pT</i> 
+by a factor <i>enhancedWidth</i> for a small fraction 
+<i>enhancedFraction</i> of the breakups, where 
+ 
+<a name="anchor2"></a>
+<p/><code>parm&nbsp; </code><strong> StringPT:enhancedFraction &nbsp;</strong> 
+ (<code>default = <strong>0.01</strong></code>; <code>minimum = 0.0</code>; <code>maximum = 1.</code>)<br/>
+<i>enhancedFraction</i>,the fraction of string breaks with enhanced 
+width. 
+   
+ 
+<a name="anchor3"></a>
+<p/><code>parm&nbsp; </code><strong> StringPT:enhancedWidth &nbsp;</strong> 
+ (<code>default = <strong>2.0</strong></code>; <code>minimum = 1.0</code>; <code>maximum = 10.0</code>)<br/>
+<i>enhancedWidth</i>,the enhancement of the width in this fraction. 
+   
+ 
+<p/> 
+In the context of some toy studies [<a href="Bibliography.html#refFis16" target="page">Fis16</a>] the following three 
+options have also been introduced, but are not part of any recommended 
+framework. 
+ 
+<a name="anchor4"></a>
+<p/><code>parm&nbsp; </code><strong> StringPT:widthPreStrange &nbsp;</strong> 
+ (<code>default = <strong>1.0</strong></code>; <code>minimum = 1.0</code>; <code>maximum = 10.0</code>)<br/>
+Prefactor multiplying the Gaussian width for strange quarks. 
+   
+ 
+<a name="anchor5"></a>
+<p/><code>parm&nbsp; </code><strong> StringPT:widthPreQQ0 &nbsp;</strong> 
+ (<code>default = <strong>1.0</strong></code>; <code>minimum = 1.0</code>; <code>maximum = 10.0</code>)<br/>
+Prefactor multiplying the Gaussian width for spin-0 diquarks. In case of 
+diquarks with one or two strange quarks the prefactor is calculated by 
+multiplying <i>widthPreQQ0</i> once or twice respectively with 
+<i>widthPreStrange</i>. 
+   
+ 
+<a name="anchor6"></a>
+<p/><code>parm&nbsp; </code><strong> StringPT:widthPreQQ1 &nbsp;</strong> 
+ (<code>default = <strong>1.0</strong></code>; <code>minimum = 1.0</code>; <code>maximum = 10.0</code>)<br/>
+Prefactor multiplying the Gaussian width for spin-1 diquarks. In case of 
+diquarks with one or two strange quarks the prefactor is calculated by 
+multiplying <i>widthPreQQ1</i> once or twice respectively with 
+<i>widthPreStrange</i>. 
+   
+ 
+</body>
+</html>
+ 
+<!-- Copyright (C) 2026 Torbjorn Sjostrand --> 

@@ -1,0 +1,241 @@
+<chapter name="HadronizationOverview"> 
+ 
+<h2>Hadronization Overview</h2> 
+ 
+Hadronization is the phase whereby partons turn into hadrons. 
+Alternatively it is called Fragmentation. In this section 
+fragmentation will be used for the key step where colour fields 
+break up into hadrons, while hadronization denotes the broader 
+concept of all physics that follow the perturbative description. 
+The prime example of such further non-fragmentation aspects is 
+particle decays, but one may also include colour reconnection, 
+the beam remnant structure and other diverse topics. 
+ 
+<a name="fragmentationSwitch"></a> 
+<h3>The main fragmentation switch</h3> 
+ 
+The fragmentation part of the PYTHIA code is in the process of being 
+reorganized, so as to allow a greater flexibility. The intention is 
+to allow new fragmentation models, either as part of the standard 
+distribution or linked externally, similarly to what has been possible 
+for parton showers since 2018. A first step was taken in version 
+8.313, where new top-level fragmentation classes were introduced, 
+and it became possible to link in external fragmentation models. 
+A second step, in 8.316, is the factoring out  of thermal string 
+fragmentation from the normal Lund string fragmentation. Further 
+steps are foreseen in the future. 
+ 
+<p/> 
+From a user point of view, the main news is a switch between 
+internally implemented fragmentation models. It is put here, 
+so as to make it easily found. Below this, and in linked pages, 
+a more detailed description of the class hierarchy, the physics 
+contents and the free settings will follow. 
+<modepick name="Fragmentation:model" default="0" min="0" max="1"> 
+Selection of main fragmentation model to be used in PYTHIA. 
+(Replaces the functionality previously available through the 
+<code>StringPT:thermalModel</code> switch, but can offer more 
+options in the future.) 
+<option value="0">The standard 
+<aloc href="StringFragmentation">Lund string fragmentation</aloc> 
+framework <ref>And83,Sjo84</ref>. 
+</option> 
+<option value="1">The alternative 
+<aloc href="ThermalFragmentation">thermal string fragmentation</aloc> 
+framework <ref>Fis16</ref>, that uses much of the same string code 
+as above, but have a different approach especially for flavour and 
+transverse momentum selection. 
+</option> 
+</modepick> 
+ 
+<a name="transitionPhase"></a> 
+<h3>The transition phase</h3> 
+ 
+Some code components lie close to the borderline between the 
+perturbative partonic world, represented by the PartonLevel 
+code section, and the non-perturbative one, in the HadronLevel code. 
+Three have been put here, mainly because their usefulness lie 
+squarely in the nonperturbative domain. 
+<ul> 
+<li>The <aloc href="BeamRemnants">beam remnants</aloc> handling 
+is the step where the remnants of the incoming beams, after a 
+number of partons have been extracted to initiate multiparton 
+interactions (MPIs), are split into a set of partons (and 
+occasionally a hadron) that share the remnant momentum. This 
+sharing is governed by ad-hoc nonperturbative rules. 
+</li> 
+<li><aloc href="ColourReconnection">Colour reconnection</aloc> 
+is the notion that the presence of multiple colour charges in an 
+event leads to the possibility for the naive colour topology 
+to be modified, e.g. to configurations with shorter strings. 
+Although defined in terms of parton colour properties, colour 
+reconnection only has a meaning in the context of fragmentation 
+patterns. 
+</li> 
+<li>The 
+<aloc href="PartonVertexInformation">parton vertex information</aloc> 
+notably distributes parton in the transverse collision plane, 
+related to hadron or nuclear spatial wave functions, and so is 
+nonperturbative in its nature. This info can be used e.g. to map 
+out the almond-shaped collision region in nucleus-nucleus collisions. 
+</li> 
+</ul> 
+ 
+<a name="mainClasses"></a> 
+<h3>The main fragmentation classes</h3> 
+ 
+Now for an overview of the current main components of the 
+fragmentation framework. 
+<ul> 
+<li><code>FragmentationModel</code> is the top-level class. 
+It is intended that all fragmentation models should derive from 
+this class, even if it is not quite true currently. It does not 
+do anything, but expects the derived class to implement the two 
+main methods <code>init</code> and <code>fragment</code>. It 
+contains pointers to the commonly used <code>StringFlav</code>, 
+<code>StringPT</code> and <code>StringZ</code>, but it is open to 
+you whether to use them. 
+</li> 
+<li><code>LundFragmentation</code> derives from 
+<code>FragmentationModel</code>. It is a small class, organizing 
+the real work to be done in <code>StringFragmentation</code> and 
+<code>MiniStringFragmentation</code>. 
+</li> 
+<li><code>ThermalFragmentation</code> also derives from 
+<code>FragmentationModel</code>, and the code closely follows 
+the one in <code>LundFragmentation</code>. The key difference it 
+that it has its own classes of the <code>StringFlav</code> and 
+<code>StringPT</code> kind. 
+</li> 
+<li><code>StringFragmentation</code> is the main class for handling 
+the fragmentation of a partonic subsystem into a set of primary 
+hadrons. Most of the machinery here cannot easily be changed, 
+but the flexibility comes from the free choice of classes 
+derived from <code>StringFlav</code>, <code>StringPT</code> and 
+<code>StringZ</code>. 
+</li> 
+<li><code>MiniStringFragmentation</code> takes over from 
+<code>StringFragmentation</code> when the mass of the fragmenting 
+system is so small that only one or two hadrons can be produced. 
+It also uses classes derived from <code>StringFlav</code>, 
+<code>StringPT</code> and <code>StringZ</code>, but the latter 
+two only marginally. 
+</li> 
+<li><code>StringFlav</code> handled the selection of a new quark or 
+diquark flavour, and the combination of an old and a new flavour 
+into a hadron. A key aspect of essentially all alternative 
+fragmentation models is that the base class is replaced by a quite 
+different derived one. The <code>StringFlav</code> class is used 
+not only in <code>StringFragmentation</code> and 
+<code>MiniStringFragmentation</code> but also in a few other places, 
+notably in some particle decays. 
+</li> 
+<li><code>StringPT</code> handles the selection of transverse momentum 
+<ei>pT</ei> in the breakup of a string, assumed to compensate exactly 
+between the quark and antiquark (or diquark-antidiquark) of a break. 
+</li> 
+<li><code>StringZ</code> selects the lightcone energy-momentum fraction 
+<ei>z</ei> to be taken by a newly produced hadron, out of what remains 
+after previous hadron production. For strings with gluon kinks 
+a more intricate procedure needs to be applied <ref>Sjo84</ref>. 
+</li> 
+</ul> 
+ 
+<a name="specialClasses"></a> 
+<h3>Special fragmentation classes</h3> 
+ 
+In addition to the <code>LundFragmentation</code> and 
+<code>ThermalFragmentation</code> options, intended to cover 
+ordinary fragmentation, there are a few other classes for 
+special applications. 
+<ul> 
+<li> <code>HiddenValleyFragmentation</code> handles the fragmentation 
+in a hypothetical 
+<aloc href="HiddenValleyProcesses">hidden sector</aloc>, using the normal 
+<code>StringFragmentation</code> and <code>MiniStringFragmentation</code> 
+classes, but with derived <code>StringFlav</code>, <code>StringPT</code> 
+and <code>StringZ</code> classes. Notably the flavour handling is 
+quite separate from the normal Standard Model one. Many fragmentation 
+parameters are rescaled from the normal values, including some "safety 
+check" cutoffs. 
+</li> 
+<li><code>RHadrons</code> handles the decay of 
+<aloc href="RHadrons">R hadrons</aloc>, i.e. long-lived particles 
+hypothesized to exist in some Beyond-the-Standard-Model scenarios, 
+such as gluinos, stops and sbottoms. The decays typically are into 
+quarks and gluons, which are handled by the normal shower and string 
+fragmentation methods, but the normal <code>StringFlav</code> and 
+<code>StringZ</code> objects find some use in the 
+<code>RHadrons</code> class. 
+</li> 
+<li><code>LowEnergyProcess</code> is primarily intended for low-energy 
+<aloc href="HadronicRescattering">hadronic rescattering</aloc> 
+in high-energy collisions, but can also be used for 
+<aloc href="QCDLowEnergyProcesses">low-energy processes</aloc>, 
+e.g. as needed in the simulation of the final stages of cosmic-ray 
+cascades. It mainly uses its own dedicated methods for various 
+processes, usually 2&rarr;2 and 2&rarr;3 ones, but for the 
+higher-energy tail (still only a few GeV) the 
+<code>StringFragmentation</code> and <code>MiniStringFragmentation</code> 
+classes can be used. 
+</li> 
+</ul> 
+ 
+The user can implement other such extra classes, and link them in, as 
+described on the 
+<aloc href="ImplementNewFragmentation">Implement New Fragmentation</aloc> 
+page. 
+ 
+<a name="othercode"></a> 
+<h3>Other fragmentation code</h3> 
+ 
+The standard string fragmentation routines contain some embedded code 
+that is not part of the baseline setup, but offers relevant extensions 
+to it. These include 
+<ul> 
+<li>Several methods are in place to allow the user to reweight generated 
+events in the parameters of the fragmentation model. This allows 
+the user to perform fast parameter variation or oversample rare 
+configurations, and reweight to the correct cross section. These 
+methods are documented on the 
+<aloc href="HadronizationVariations">Hadronization Variations</aloc> 
+page. 
+</li> 
+<li>When several strings come close or overlap they may form strings 
+of a higher colour representation, so-called ropes, and/or they may repel 
+each other, so-called shove. A scenario exists for these phenomena, 
+see <aloc href="RopeHadronization">Rope Hadronization</aloc>. This 
+scenario could one day be extracted into separate classes, notably for 
+flavour handling, but is currently hardcoded as options or additions 
+inside the normal string fragmentation routines. 
+</li> 
+<li>The <aloc href="ClosePacking">close-packing</aloc> scenario is 
+a similar but simpler approach to the one above, again relevant for 
+the case of several nearby strings, and again hardcoded inside the 
+existing routines. 
+</li> 
+<li>The space-time evolution of the fragmentation process mirrors the 
+energy-momentum one, with some twists, but by default is not 
+reconstructed. For applications such as hadronic rescattering the 
+<aloc href="HadronVertexInformation">hadron production vertices </aloc> 
+need to be reconstructed, however, and this is then done inside the 
+string fragmentation methods. 
+</li> 
+</ul> 
+ 
+The models for 
+<aloc href="BoseEinsteinEffects">Bose-Einstein effects</aloc> and 
+<aloc href="DeuteronProduction">deuteron production</aloc> also are 
+extensions of the basic fragmentation framework, but do not overlap 
+with the string fragmentation code. 
+ 
+<p/> 
+Finally, note that the fragmentation routines normally are not called 
+by the user, but as part of the full PYTHIA event generation. The 
+<aloc href="HadronLevelStandalone">Hadron-Level Standalone</aloc> 
+page explains how to set up your own partonic configuration and then 
+fragment it. 
+ 
+</chapter> 
+ 
+<!-- Copyright (C) 2026 Torbjorn Sjostrand --> 

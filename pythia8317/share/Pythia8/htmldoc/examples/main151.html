@@ -1,0 +1,57 @@
+<html><head><title>main151</title>
+<link rel="stylesheet" type="text/css" href="../pythia.css"/>
+<link rel="shortcut icon" href="../pythia32.gif"/></head><body><h2>main151</h2>
+Back to <a href="../ExampleKeywords.html" target="page">index.</a>
+<pre><code class="language-c++">
+// main151.cc is a part of the PYTHIA event generator.
+// Copyright (C) 2026 Torbjorn Sjostrand.
+// PYTHIA is licenced under the GNU GPL v2 or later, see COPYING for details.
+// Please respect the MCnet Guidelines, see GUIDELINES for details.
+
+// Authors:
+//            <a href="mailto:christian.preuss@uni-goettingen.de">Christian T. Preuss</a>
+
+// Keywords:
+//            <a href="../ExampleKeywords.html#mc@nlo">MC@NLO</a>
+//            <a href="../ExampleKeywords.html#amc@nlo">aMC@NLO</a>
+//            <a href="../ExampleKeywords.html#madgraph5_amc@nlo">MadGraph5_aMC@NLO</a>
+
+// This is a simple program to demonstrate MC@NLO matching
+// with events MadGraph5_aMC@NLO.
+
+#include &quot;Pythia8/Pythia.h&quot;
+using namespace Pythia8;
+
+int main() {
+
+  // Generator.
+  Pythia pythia;
+  pythia.readFile(&quot;main151.cmnd&quot;);
+  // If Pythia fails to initialize, exit with error.
+  if (!pythia.init()) return 1;
+
+  // Number of events.
+  int nEvent = pythia.mode(&quot;Main:numberOfEvents&quot;);
+
+  // Histogram.
+  Hist pTZ(&quot;pT Z&quot;, 50, 0., 200.);
+
+  // Event loop.
+  for (int iEvent = 0; iEvent &lt; nEvent; ++iEvent) {
+    if (!pythia.next()) continue;
+
+    // Find the final copy of the W and its pT.
+    int iZ = 0;
+    for (int i = pythia.event.size() - 1; i &gt; 0; --i)
+      if (pythia.event[i].idAbs() == 23) {iZ = i; break;}
+    pTZ.fill(pythia.event[iZ].pT());
+  }
+
+  // Print statistics and histogram.
+  pythia.stat();
+  cout &lt;&lt; pTZ;
+
+  // Done.
+  return 0;
+}
+</code></pre></body></html>

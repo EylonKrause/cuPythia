@@ -1,0 +1,163 @@
+<html><head><title>main424</title>
+<link rel="stylesheet" type="text/css" href="../pythia.css"/>
+<link rel="shortcut icon" href="../pythia32.gif"/></head><body><h2>main424</h2>
+Back to <a href="../ExampleKeywords.html" target="page">index.</a>
+<pre><code class="language-c++">
+// main424.cc is a part of the PYTHIA event generator.
+// Copyright (C) 2026 Torbjorn Sjostrand.
+// PYTHIA is licenced under the GNU GPL v2 or later, see COPYING for details.
+// Please respect the MCnet Guidelines, see GUIDELINES for details.
+
+// Authors:
+//            Marius Utheim
+//            <a href="mailto:leif.lonnblad@fysik.lu.se">Leif Lonnblad</a>
+
+// Keywords:
+//            <a href="../ExampleKeywords.html#hadron-ion+collisions">Hadron&#8209;ion&nbsp;collisions</a>
+//            <a href="../ExampleKeywords.html#cosmic+rays">Cosmic&nbsp;rays</a>
+//            <a href="../ExampleKeywords.html#optimization">Optimization</a>
+
+// The purpose of this example is to generate an initialization file that
+// can be used to speed up initialization in hadron-hadron or hadron-ion runs.
+// By default, it produces data for energies from 10 to 10^7 GeV.
+// All hadron-nucleon and hadron-ion interactions are possible.
+// In other main programs, after initializing with the main424.cmnd file,
+// it is possible to change energy and beam types on a per-event basis.
+// Warning: the generation takes a long time, of the order of 3 hours,
+// whereof most of it is spent on the nuclear geometry initialization.
+// But, of course, once done you will save time in subsequent runs.
+
+#include &quot;Pythia8/Pythia.h&quot;
+
+using namespace Pythia8;
+
+int main(int argc, char ** argv) {
+
+  int option = argc &gt; 1? atoi(argv[1]): 0;
+  // option = 0: generate combined MPI and Angantyr file.
+  // option = 1: generate only MPI file.
+  // option = 2: generate only Angantyr file (assumes MPI file exists).
+  string initMPIcmnd = &quot;include = setups/InitDefaultMPI.cmnd&quot;;
+  string filename = &quot;main424&quot;;
+  if ( option &gt; 0 ) filename += string(&quot;-&quot;) + argv[1];
+  filename += &quot;.cmnd&quot;;
+
+  // The maximum energy.
+  double eCMMax = 1e7;
+
+  // The number of points in the (logarithmic) interpoaltion grid for
+  // Angantyr (can be lowered to get faster results):
+  int nGridHI   = 25;
+
+  // The number of integrations points for the MPI interpolation.
+  int nIntPts   = 1000000;
+
+  // Use Angantyr even when initializing with pp.
+  Pythia pythia;
+
+  // Variable energy parameters.
+  pythia.readString(&quot;Beams:allowVariableEnergy = on&quot;);
+  pythia.settings.parm(&quot;Beams:eCM&quot;, eCMMax);
+  pythia.readString(&quot;SoftQCD:all = on&quot;);
+
+  // Variable beam type parameters.
+  pythia.readString(&quot;Beams:allowIDASwitch = on&quot;);
+
+  if ( option != 1 ) {
+    // Setup Angantyr for initialisation.
+    pythia.readString(&quot;HeavyIon:mode = 2&quot;);
+    pythia.settings.parm(&quot;HeavyIon:varECMMax&quot;, eCMMax);
+    pythia.settings.parm(&quot;HeavyIon:varECMMin&quot;, 10.);
+    pythia.settings.mode(&quot;HeavyIon:varECMSigFitNPts&quot;, nGridHI);
+
+    // For subcollision models other than the default, use 1 here:
+    pythia.settings.mode(&quot;HeavyIon:varECMStepwiseEvolve&quot;, 2);
+
+    // Set reasonable starting parameters for the maximum energy. And
+    // reasonable target errors for semi-inclusive xsecs (noting that
+    // double diffrection is almost impossible to fit).
+    pythia.readString(&quot;HeavyIon:SigFitDefPar = 4.73,32.65,0.69&quot;);
+    pythia.readString(&quot;HeavyIon:SigFitErr =&quot;
+       &quot;0.02,0.02,0.0,0.02,0.02,0.0,0.02,0.2&quot;);
+    pythia.readString(&quot;HeavyIon:SigFitNGen = 20&quot;);
+    pythia.readString(&quot;HeavyIon:SigFitMaxChi2 = 1.5&quot;);
+    pythia.readString(&quot;HeavyIon:SigFitMaxChi2Max = 4&quot;);
+
+    // If you set reuseInit &gt; 0, you also need to specify file names
+    // here. Otherwise the files are produced explicitly below.
+    pythia.readString(&quot;HeavyIon:SasdMpiReuseInit = -1&quot;);
+    pythia.readString(&quot;HeavyIon:SasdMpiInitFile = &quot;);
+    pythia.readString(&quot;HeavyIon:SigFitReuseInit = -1&quot;);
+    pythia.readString(&quot;HeavyIon:SigFitInitFile = &quot;);
+  }
+
+  if ( option == 2 ) {
+    // Read in previous MPI file.
+    pythia.readString(initMPIcmnd);
+  } else {
+    // Increased statistics for MPI initialization gives smaller errors.
+    pythia.settings.mode(&quot;MultipartonInteractions:nSample&quot;, nIntPts);
+
+    // If you set reuseInit &gt; 0, you also need to specify file names
+    // here. Otherwise the files are produced explicitly below.
+    pythia.readString(&quot;MultipartonInteractions:reuseInit = -1&quot;);
+    pythia.readString(&quot;MultipartonInteractions:initFile = &quot;);
+  }
+
+  // Also save and print the maximum energy for easy checks.
+  pythia.settings.parm(&quot;Beams:eCMMaxMPI&quot;, eCMMax);
+
+  // Specify where to save. If you set reuseInit = 2, the old files
+  // will be replaced/overwritten if they already exist. -1 means that
+  // the initialization is stored in the settings, and can be written
+  // out.
+
+  if (!pythia.init()) {
+    cout &lt;&lt; &quot; Pythia failed to initialize.&quot; &lt;&lt; endl
+         &lt;&lt; &quot; Please validate your settings in main424.cmnd.&quot; &lt;&lt; endl;
+    return -1;
+  }
+
+  // Note that writeFile will write out all changed settings, not only
+  // the ones containing the initialisations, so some manual clean-up
+  // is needed to avoid this.
+  pythia.readString(&quot;Beams:eCM = DEFAULT&quot;);
+  pythia.readString(&quot;HeavyIon:mode = DEFAULT&quot;);
+  pythia.readString(&quot;Next:numberCount = DEFAULT&quot;);
+  pythia.readString(&quot;Next:numberShowEvent = DEFAULT&quot;);
+  pythia.readString(&quot;Next:numberShowInfo = DEFAULT&quot;);
+  pythia.readString(&quot;Next:numberShowLHA = DEFAULT&quot;);
+  pythia.readString(&quot;Next:numberShowProcess = DEFAULT&quot;);
+  pythia.readString(&quot;PartonLevel:all = DEFAULT&quot;);
+  pythia.readString(&quot;ProcessLevel:all = DEFAULT&quot;);
+  pythia.readString(&quot;SoftQCD:all = DEFAULT&quot;);
+  pythia.readString(&quot;Tune:ee = DEFAULT&quot;);
+  pythia.readString(&quot;Tune:pp = DEFAULT&quot;);
+  pythia.readString(&quot;StringZ:useOldAExtra = DEFAULT&quot;);
+  pythia.readString(&quot;MultipartonInteractions:initFile = DEFAULT&quot;);
+  pythia.readString(&quot;HeavyIon:SigFitInitFile = DEFAULT&quot;);
+  pythia.readString(&quot;HeavyIon:SasdMpiInitFile = DEFAULT&quot;);
+  pythia.readString(&quot;HeavyIon:SigFitDefPar = DEFAULT&quot;);
+  pythia.readString(&quot;HeavyIon:SigFitErr = DEFAULT&quot;);
+  pythia.readString(&quot;HeavyIon:SigFitNGen = DEFAULT&quot;);
+  pythia.readString(&quot;HeavyIon:SigFitMaxChi2 = DEFAULT&quot;);
+  pythia.readString(&quot;HeavyIon:SigFitMaxChi2Max = DEFAULT&quot;);
+  pythia.readString(&quot;HeavyIon:varECMMax = DEFAULT&quot;);
+  pythia.readString(&quot;HeavyIon:mode = DEFAULT&quot;);
+
+  if ( option == 2 ) {
+    pythia.readString(&quot;Init:reuseMPIiDiffSys0 = DEFAULT&quot;);
+    pythia.readString(&quot;Init:reuseMPIiDiffSys1 = DEFAULT&quot;);
+    pythia.readString(&quot;Init:reuseMPIiDiffSys2 = DEFAULT&quot;);
+    pythia.readString(&quot;Init:reuseMPIiDiffSys3 = DEFAULT&quot;);
+  }
+
+  ofstream os(filename.c_str());
+  if ( option == 2 ) os &lt;&lt; initMPIcmnd &lt;&lt; endl;
+  pythia.settings.writeFile(os);
+
+  // After initializing, we&apos;re done.
+
+  return 0;
+}
+</code></pre></body></html>

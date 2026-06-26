@@ -1,0 +1,299 @@
+<html>
+<head>
+<title>StringFragmentation</title>
+<link rel="stylesheet" type="text/css" href="pythia.css"/>
+<link rel="shortcut icon" href="pythia32.gif"/>
+</head>
+<body>
+ 
+<h2>Lund String Fragmentation</h2> 
+<ol id="toc">
+  <li><a href="#section0">Jet joining procedure</a></li>
+  <li><a href="#section1">Colour tracing</a></li>
+  <li><a href="#section2">Simplifying systems</a></li>
+  <li><a href="#section3">Ministrings</a></li>
+  <li><a href="#section4">String junctions</a></li>
+</ol>
+
+ 
+The standard fragmentation in PYTHIA is based on the Lund string model 
+[<a href="Bibliography.html#refAnd83" target="page">And83</a>, <a href="Bibliography.html#refSjo84" target="page">Sjo84</a>]. Several different aspects are involved in 
+the physics description, which here therefore is split accordingly. 
+This also, at least partly, reflects the set of classes involved in 
+the fragmentation machinery. See the 
+<a href="HadronizationOverview.html" target="page">Hadronization Overview</a> 
+to understand how the key classes are related, and also how 
+the basic Lund String Fragmentation machinery is the starting point 
+for a number of alternatives or extensions. 
+ 
+<p/> 
+There are three main auxiliary classes for string fragmentation, 
+each handling an important physics step. Many of the settings for 
+each of them play a key role in the tuning to data, while some others 
+should not be touched except by experts. 
+<ul> 
+<li>The choice of quark flavours at string breaks, and the choice of 
+a hadron from a given flavour combination, is managed in the 
+<code>StringFlav</code> class, with settings as described on the 
+<a href="FlavourSelection.html" target="page">Flavour Selection</a> page. 
+The fragmentation flavour-choice machinery is also used in a few 
+other places of the program, notably in particle decays. 
+</li> 
+<li>The choice of <i>pT</i> transverse momentum kicks in string breaks 
+is managed by the <code>StringPT</code> class, with settings as described 
+on the <a href="PTSelection.html" target="page">pT Selection</a> page. 
+</li> 
+<li>The choice of the <i>z</i> variable, representing the 
+energy-momentum lightcone fraction that a new hadron takes out of the 
+remaining (i.e. not yet fragmented) amount, 
+is managed by the <code>StringZ</code> class, with settings as described 
+on the <a href="ZSelection.html" target="page">z Selection</a> page. 
+</li> 
+</ul> 
+ 
+<p/> 
+Several further options and parameters, e.g., for the joining of jets 
+and for the handling of a number of special systems, such as low-mass 
+strings and string junctions, are documented below. Most of them are 
+intended for experts, and can be left at their default values. 
+ 
+<a name="section0"></a> 
+<h3>Jet joining procedure</h3> 
+ 
+String fragmentation is carried out iteratively from both string ends 
+inwards, which means that the two chains of hadrons have to be joined 
+up somewhere in the middle of the event. This joining is described by 
+parameters that in principle follow from the standard fragmentation 
+parameters. Ideally, these joining parameters should be tuned such 
+that the rapidity spacing and mass distribution of hadrons produced in 
+the joining step match those produced in the standard fragmentation 
+process as closely as possible.  The current default values were 
+determined for the JETSET tune and have not been retuned since. Recent 
+studies have shown that these choices do not produce a smooth joining 
+for the current default Monash tune settings. Work is underway to 
+improve the smoothness - and robustness - of this procedure. As a 
+temporary step, the <code>stopMass</code> below was somewhat reduced 
+in version 8.316, from <i>1.0</i> to <i>0.8</i> GeV. 
+ 
+<a name="anchor1"></a>
+<p/><code>parm&nbsp; </code><strong> StringFragmentation:stopMass &nbsp;</strong> 
+ (<code>default = <strong>0.8</strong></code>; <code>minimum = 0.0</code>; <code>maximum = 2.0</code>)<br/>
+Is used to define a <i>W_min = m_q1 + m_q2 + stopMass</i>, 
+where <i>m_q1</i> and <i>m_q2</i> are the masses of the two 
+current endpoint quarks or diquarks. 
+   
+ 
+<a name="anchor2"></a>
+<p/><code>parm&nbsp; </code><strong> StringFragmentation:stopNewFlav &nbsp;</strong> 
+ (<code>default = <strong>2.0</strong></code>; <code>minimum = 0.0</code>; <code>maximum = 2.0</code>)<br/>
+Add to <i>W_min</i> an amount <i>stopNewFlav * m_q_last</i>, 
+where <i>q_last</i> is the last <i>q qbar</i> pair produced 
+between the final two hadrons. 
+   
+ 
+<a name="anchor3"></a>
+<p/><code>parm&nbsp; </code><strong> StringFragmentation:stopSmear &nbsp;</strong> 
+ (<code>default = <strong>0.2</strong></code>; <code>minimum = 0.0</code>; <code>maximum = 0.5</code>)<br/>
+The <i>W_min</i> above is then smeared uniformly in the range 
+<i>W_min_smeared = W_min * [ 1 - stopSmear, 1 + stopSmear ]</i>. 
+   
+ 
+<p/> 
+This <i>W_min_smeared</i> is then compared with the current remaining 
+<i>W_transverse</i> to determine if there is energy left for further 
+particle production. If not, i.e. if 
+<i>W_transverse &lt; W_min_smeared</i>, the final two particles are 
+produced from what is currently left, if possible. (If not, the 
+fragmentation process is started over.) 
+ 
+<a name="section1"></a> 
+<h3>Colour tracing</h3> 
+ 
+<a name="anchor4"></a>
+<p/><code>flag&nbsp; </code><strong> StringFragmentation:TraceColours &nbsp;</strong> 
+ (<code>default = <strong>off</strong></code>)<br/>
+In some cases it is interesting to trace the primary hadrons back 
+to the string pieces from which they were 
+formed. If <code>StringFragmentation:TraceColours</code> is switched 
+<code>on</code>, this is done by setting colour and anticolour 
+indices for the primary hadrons to the indices of the string piece 
+where the corresponding break-ups are assumed to have happened. To 
+avoid the possible confusion of having colour indices on colour 
+singlet particles, this flag is by default <code>off</code>. 
+   
+ 
+<a name="section2"></a> 
+<h3>Simplifying systems</h3> 
+ 
+There are a few situations when it is meaningful to simplify the 
+original task, one way or another. 
+ 
+<a name="anchor5"></a>
+<p/><code>parm&nbsp; </code><strong> HadronLevel:mStringMin &nbsp;</strong> 
+ (<code>default = <strong>1.</strong></code>; <code>minimum = 0.5</code>; <code>maximum = 1.5</code>)<br/>
+Decides whether a partonic system should be considered as a normal 
+string or a ministring, the latter only producing one or two primary 
+hadrons. The system mass should be above <i>mStringMin</i> plus the 
+sum of quark/diquark constituent masses for a normal string description, 
+else the ministring scenario is used. 
+   
+ 
+<a name="anchor6"></a>
+<p/><code>parm&nbsp; </code><strong> FragmentationSystems:mJoin &nbsp;</strong> 
+ (<code>default = <strong>0.3</strong></code>; <code>minimum = 0.2</code>; <code>maximum = 1.</code>)<br/>
+When two colour-connected partons are very nearby, with at least 
+one being a gluon, they can be joined into one, to avoid technical 
+problems of very small string regions. The requirement for joining is 
+that the invariant mass of the pair is below <i>mJoin</i>, where a 
+gluon only counts with half its momentum, i.e. with its contribution 
+to the string region under consideration. (Note that, for technical 
+reasons, the 0.2 GeV lower limit is de facto hardcoded.) 
+   
+ 
+<a name="anchor7"></a>
+<p/><code>parm&nbsp; </code><strong> FragmentationSystems:mJoinJunction &nbsp;</strong> 
+ (<code>default = <strong>1.0</strong></code>; <code>minimum = 0.5</code>; <code>maximum = 2.</code>)<br/>
+When the invariant mass of two of the quarks in a three-quark junction 
+string system becomes too small, the system is simplified to a 
+quark-diquark simple string. The requirement for this simplification 
+is that the diquark mass, minus the two quark masses, falls below 
+<i>mJoinJunction</i>. Gluons on the string between the junction and 
+the respective quark, if any, are counted as part of the quark 
+four-momentum. Those on the two combined legs are clustered with the 
+diquark when it is formed. 
+   
+ 
+<a name="section3"></a> 
+<h3>Ministrings</h3> 
+ 
+The <code>MiniStringFragmentation</code> machinery is only used when a 
+string system has so small invariant mass that normal string fragmentation 
+is difficult/impossible. Instead one or two particles are produced, 
+in the former case shuffling energy-momentum relative to another 
+colour singlet system in the event, while preserving the invariant 
+mass of that system. With one exception parameters are the same as 
+defined for normal string fragmentation, to the extent that they are 
+at all applicable in this case. 
+ 
+A discussion of the relevant physics is found in [<a href="Bibliography.html#refNor00" target="page">Nor00</a>]. 
+The current implementation does not completely abide to the scheme 
+presented there, however, but has in part been simplified. (In part 
+for greater clarity, in part since the class is not quite finished yet.) 
+ 
+<a name="anchor8"></a>
+<p/><code>mode&nbsp; </code><strong> MiniStringFragmentation:nTry &nbsp;</strong> 
+ (<code>default = <strong>2</strong></code>; <code>minimum = 1</code>; <code>maximum = 10</code>)<br/>
+Whenever the machinery is called, first this many attempts are made 
+to pick two hadrons that the system fragments to. If the hadrons are 
+too massive the attempt will fail, but a new subsequent try could 
+involve other flavour and hadrons and thus still succeed. 
+After <i>nTry</i> attempts, instead an attempt is made to produce a 
+single hadron from the system. Should also this fail, some further 
+attempts at obtaining two hadrons will be made before eventually 
+giving up. 
+   
+ 
+<a name="anchor9"></a>
+<p/><code>flag&nbsp; </code><strong> MiniStringFragmentation:tryAfterFailedFrag &nbsp;</strong> 
+ (<code>default = <strong>off</strong></code>)<br/>
+If normal string fragmentation fails for a parton system, it is optionally 
+possible to attempt to fragment it as if it had been a ministring 
+(c.f. <code>HadronLevel:mStringMin</code>). This is mainly relevant for 
+heavy-ion collisions and for the QCD-based colour-reconnection model, 
+where many high-multiplicity events have a higher probability to have 
+failed fragmentation (hence throwing the whole event away may skew the 
+multiplicity distribution). 
+   
+ 
+<a name="section4"></a> 
+<h3>String junctions</h3> 
+ 
+A junction topology corresponds to an Y arrangement of strings 
+i.e. where three string pieces have to be joined up in a junction. 
+Such topologies can arise if several valence quarks are kicked out 
+from a proton beam, or in baryon-number-violating SUSY decays. 
+Special attention is necessary to handle the region just around the 
+junction, where the baryon number topologically is located. The 
+junction fragmentation scheme is described in [<a href="Bibliography.html#refSjo03" target="page">Sjo03</a>] and 
+[<a href="Bibliography.html#refAlt24" target="page">Alt24</a>]. The parameters in this section should not be 
+touched except by experts. 
+ 
+<a name="anchor10"></a>
+<p/><code>parm&nbsp; </code><strong> StringFragmentation:pNormJunction &nbsp;</strong> 
+ (<code>default = <strong>2.0</strong></code>; <code>minimum = 0.5</code>; <code>maximum = 10</code>)<br/>
+Used to find the effective rest frame of the junction, which is 
+complicated when the three string legs may contain additional 
+gluons between the junction and the endpoint. Should in principle be 
+(close to) <i>sqrt((1 + a) / b)</i>, with <i>a</i> and <i>b</i> 
+the parameters of the Lund symmetric fragmentation function. 
+   
+ 
+<a name="anchor11"></a>
+<p/><code>parm&nbsp; </code><strong> StringFragmentation:eJunctionCutoff &nbsp;</strong> 
+ (<code>default = <strong>0.0</strong></code>)<br/>
+Used as a stopping condition for the fragmentation of the first two 
+junction legs. Fragmentation of the given junction leg is stopped if 
+performing another break would leave the remaining energy of the 
+junction leg below <i>eJunctionCutoff</i>. Value should be less than 
+<i>eBothLeftJunction</i>. 
+   
+ 
+<a name="anchor12"></a>
+<p/><code>parm&nbsp; </code><strong> StringFragmentation:mJunctionCutoff &nbsp;</strong> 
+ (<code>default = <strong>0.0</strong></code>)<br/>
+Used as a stopping condition for the fragmentation of the first two 
+junction legs. Fragmentation of the given junction leg is stopped if 
+performing another break would leave the mass of the junction diquark 
+below <i>mJunctionCutoff</i>. 
+   
+ 
+<a name="anchor13"></a>
+<p/><code>parm&nbsp; </code><strong> StringFragmentation:eBothLeftJunction &nbsp;</strong> 
+ (<code>default = <strong>1.0</strong></code>; <code>minimum = 0.5</code>)<br/>
+Retry (up to 10 times) when the first two considered strings in to a 
+junction both have a remaining energy (in the junction rest frame) 
+above this number. 
+   
+ 
+<a name="anchor14"></a>
+<p/><code>parm&nbsp; </code><strong> StringFragmentation:eMaxLeftJunction &nbsp;</strong> 
+ (<code>default = <strong>10.0</strong></code>; <code>minimum = 0.</code>)<br/>
+Retry (up to 10 times) when the first two considered strings in to a 
+junction has a highest remaining energy (in the junction rest frame) 
+above a random energy evenly distributed between 
+<i>eBothLeftJunction</i> and 
+<i>eBothLeftJunction + eMaxLeftJunction</i> 
+(drawn anew for each test). 
+   
+ 
+<a name="anchor15"></a>
+<p/><code>parm&nbsp; </code><strong> StringFragmentation:eMinLeftJunction &nbsp;</strong> 
+ (<code>default = <strong>0.2</strong></code>; <code>minimum = 0.</code>)<br/>
+Retry (up to 10 times) when the invariant mass-squared of the final leg 
+and the leftover momentum of the first two treated legs falls below 
+<i>eMinLeftJunction</i> times the energy of the final leg (in the 
+junction rest frame). 
+   
+ 
+<a name="anchor16"></a>
+<p/><code>flag&nbsp; </code><strong> StringFragmentation:doStrangeJunctions &nbsp;</strong> 
+ (<code>default = <strong>off</strong></code>)<br/>
+Switching this parameter on allows strangeness enhancement for string breaks 
+next to a junction. 
+   
+ 
+<a name="anchor17"></a>
+<p/><code>parm&nbsp; </code><strong> StringFragmentation:enhanceStrangeJunction &nbsp;</strong> 
+ (<code>default = <strong>0.5</strong></code>; <code>minimum = 0.</code>; <code>maximum = 1.0</code>)<br/>
+This parameter, <i>s<sub>J</sub></i>, scales how much strangeness 
+enhancement around a junction by modifying the probability 
+<code>StringFlav:probStoUD</code>, 
+<br/><i> 
+    P'(s:u/d) = P(s:u/d)<sup>(1 - s_J)</sup>. 
+</i><br/> 
+   
+ 
+</body>
+</html>
+ 
+<!-- Copyright (C) 2026 Torbjorn Sjostrand --> 

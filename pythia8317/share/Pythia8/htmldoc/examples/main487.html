@@ -1,0 +1,919 @@
+<html><head><title>main487</title>
+<link rel="stylesheet" type="text/css" href="../pythia.css"/>
+<link rel="shortcut icon" href="../pythia32.gif"/></head><body><h2>main487</h2>
+Back to <a href="../ExampleKeywords.html" target="page">index.</a>
+<pre><code class="language-c++">
+// main487.cc is a part of the PYTHIA event generator.
+// Copyright (C) 2026 Torbjorn Sjostrand.
+// PYTHIA is licenced under the GNU GPL v2 or later, see COPYING for details.
+// Please respect the MCnet Guidelines, see GUIDELINES for details.
+
+// Author: Torbjorn Sjostrand &lt;torbjorn.sjostrand@fysik.lu.se&gt;
+// partly based on code by Marius Utheim
+
+// Keywords:
+//            <a href="../ExampleKeywords.html#cosmic+ray+cascade">Cosmic&nbsp;ray&nbsp;cascade</a>
+//            <a href="../ExampleKeywords.html#switch+beam">Switch&nbsp;beam</a>
+//            <a href="../ExampleKeywords.html#switch+collision+energy">Switch&nbsp;collision&nbsp;energy</a>
+
+// Cosmic ray evolution in the atmosphere, with proton or nucleus beam,
+// and with a direct comparison between Angantyr and PythiaCascade.
+
+#include &quot;Pythia8/Pythia.h&quot;
+#include &quot;Pythia8/HIInfo.h&quot;
+#include &quot;Pythia8Plugins/PythiaCascade.h&quot;
+#include &quot;Pythia8Plugins/ProgressLog.h&quot;
+
+using namespace Pythia8;
+
+//==========================================================================
+
+// Note: when a hadron interacts with a medium particle, the latter is added
+// to the event record. This program uses these additional status codes for
+// target particles in the medium:
+//  181: the first (or only) target nucleon in a collision.
+//  182: nucleons from further subcollisions with the same target nucleus.
+
+// Conversion factor between mm and km.
+constexpr double KM2MM = 1.e6;
+
+// Conversion factor for kg/m^3 to GeV/(c^2 mm mb)
+constexpr double kg_m3_to_GeV_c2mm1mb1 =  5.60958865e26 // kg to GeV/c2
+  * 0.001  // m^-1 to mm^-1
+  * 1e-31; // m^-2 to mb^-1
+
+// Medium parameters. Assume exponential atmosphere.
+constexpr double mp   = 0.93827;
+constexpr double mn   = 0.93957;
+constexpr double mAir = 0.9315;
+constexpr double mediumDensity = 1.225 * kg_m3_to_GeV_c2mm1mb1 / mAir;
+constexpr double rhoAir = 1.225e-4; // g cm^-2 mm^-1
+constexpr double mediumHeight = 100 * KM2MM;
+constexpr double H = 10.4 * KM2MM;
+
+// Atmosphere with 78.5% 14N, 21% 16O and 0.5% 40Ar by number of nuclei.
+// Note: often composition by mole is quoted, then with 1% Ar, since
+// nitrogen and oxygen form molecules N_2 and O_2 but argon is a noble gas.
+constexpr double fracN  = 0.785;
+constexpr double fracO  = 0.21;
+constexpr double fracAr = 0.005;
+
+// Inform Angantyr about the ions in the atmosphere.
+const vector&lt;int&gt; mediumIons = { 1000070140, 1000080160, 1000180400 };
+const vector&lt;double&gt; mediumFracs = { fracN, fracO, fracAr };
+
+// Model parameters.
+// The zenith angle of the primary particle (0 = straight down).
+constexpr double zenithAngle = 0.;
+
+// Get the medium depth of a particle at the specified height.
+double getDepth(double h) {
+  return rhoAir * H * exp(-h / H) /  cos(zenithAngle); }
+
+//==========================================================================
+
+int main() {
+
+//========== Basic properties ==========
+
+  // In a run two secarios are compared, in each case with a projectile
+  // hitting the atmosphere and inducing a cascade.
+  // The comparison mode select the scenario for the incoming projectile:
+  // = 1: proton with momentum pPri, Angantyr vs. Cascade;
+  // = 2: nucleus with summed momentum A * pPri, with Angantyr,
+  //      vs. Z protons and A - Z neutrons each with pPri, with Cascade;
+  // = 3: as 2, but use Angantyr in both places;
+  // = 4: nucleus with summed momentum A * pPri, with Angantyr,
+  //      vs. proton with momentum A * pPri, with Cascade;
+  // = 5: as 4, but use Angantyr in both places.
+  int comparison = 3;
+
+  // Nuclear properties, in case such a one is selected. Default is iron.
+  int Znuc  = 26;
+  int Anuc  = 56;
+
+  // Momentum baseline; may be multiplied as above.
+  double pPri  = 1e4;
+
+  // Number of events per case. Only do a few since each shower is so big.
+  int nEvent = 1000;
+
+  // Minimal kinetic energy for an interaction to be simulated.
+  double eKinMin = 0.5;
+
+  // Check, to catch potential infinite loops, or not for upper limit
+  // of event record size. The size increases roghly linearly with energy.
+  bool checkSize = false;
+  int maxSize = 20000 + 3 * int(pPri);
+
+  // Minimal kinetic energy for some histogramming of particles.
+  double eKinMinHist = 10.;
+
+  // All figures are collected in fig487-qualifier.pdf, if
+  // &quot;python3 plot487.py&quot; is executed after the run. The qualifier
+  // is generated from the values of the main event specifications above,
+  // &quot;comparison-pPri-nEvent&quot;. You may additionally ask to generate
+  // five of them as separate figures, fig487a-qualifier.pdf, etc.
+  bool separateFigs = true;
+
+//========== Initialization ==========
+
+  // Scenario beam names.
+  vector&lt;string&gt; legendA = {&quot;Angantyr(p)&quot;, &quot;Angantyr(A)&quot;, &quot;Angantyr(A)&quot;,
+    &quot;Angantyr(A)&quot;, &quot;Angantyr(A)&quot;};
+  vector&lt;string&gt; legendB = {&quot;Cascade(p)&quot;, &quot;Cascade(A*p/n)&quot;, &quot;Angantyr(A*p/n)&quot;,
+    &quot;Cascade(p)&quot;, &quot;Angantyr(p)&quot;};
+  vector&lt;string&gt; legend = { legendA[comparison - 1], legendB[comparison - 1]};
+
+  // Book histograms.
+  const int nCases = 2;
+  double depthMax = rhoAir * H / cos(zenithAngle);
+  Hist nInt[nCases], diffHadA[nCases], diffHadS[nCases], rateMuonP[nCases],
+    rateMuonD[nCases], diffMuonA[nCases], diffMuonS[nCases], prodnueA[nCases],
+    prodnueS[nCases], prodnumuA[nCases], prodnumuS[nCases], eventSize[nCases],
+    nucleonEnergy[nCases], finalNucleonEnergy[nCases], eKinColl[nCases],
+    eDepthNuc[nCases], eDepthHad[nCases], eDepthEM[nCases], eDepthMu[nCases],
+    eDepthNu[nCases], eMaxEMnow[nCases], eMaxEM[nCases], eAvgEM[nCases];
+  for (int iC = 0; iC &lt; nCases; ++iC) {
+    nInt[iC].book(&quot;depth of interactions&quot;,             100, 0., depthMax);
+    diffHadA[iC].book(&quot;hadron production-decay depth&quot;, 100, 0., depthMax);
+    diffHadS[iC].book(&quot;hadron production-decay depth&quot;, 100, 0., depthMax);
+    rateMuonD[iC].book(&quot;muon decay depth&quot;,             100, 0., depthMax);
+    rateMuonP[iC].book(&quot;muon production depth&quot;,        100, 0., depthMax);
+    diffMuonA[iC].book(&quot;muon production-decay depth&quot;,  100, 0., depthMax);
+    diffMuonS[iC].book(&quot;muon production-decay depth&quot;,  100, 0., depthMax);
+    prodnueA[iC].book(&quot;nu_e production depth&quot;,         100, 0., depthMax);
+    prodnueS[iC].book(&quot;nu_e production depth&quot;,         100, 0., depthMax);
+    prodnumuA[iC].book(&quot;nu_mu production depth&quot;,       100, 0., depthMax);
+    prodnumuS[iC].book(&quot;nu_mu production depth&quot;,       100, 0., depthMax);
+    eDepthNuc[iC].book(&quot;Nuclear energy at depth&quot;,      100, 0., depthMax);
+    eDepthHad[iC].book(&quot;Hadronic energy at depth&quot;,     100, 0., depthMax);
+    eDepthEM[iC].book(&quot;Electromag.energy at depth&quot;,    100, 0., depthMax);
+    eDepthMu[iC].book(&quot;Muon energy at depth&quot;,          100, 0., depthMax);
+    eDepthNu[iC].book(&quot;Neutrino energy at depth&quot;,      100, 0., depthMax);
+    eventSize[iC].book(&quot;event size&quot;,                    80, 10., 1e9, true);
+    nucleonEnergy[iC].book(&quot;Nucleon Energy&quot;,            50, 0.0, 10.0);
+    finalNucleonEnergy[iC].book(&quot;Final nucleon energy&quot;, 50, 0.0, 10.0);
+    eKinColl[iC].book(&quot;kinetic energy of collisions&quot;,   50, 0.0, 10.0);
+    eMaxEMnow[iC].book(&quot;Electromag.maximum at depth&quot;,  100, 0., 0.5*depthMax);
+    eMaxEM[iC].book(&quot;Electromag.maximum at depth&quot;,     100, 0., 0.5*depthMax);
+    eAvgEM[iC].book(&quot;Electromag.maximum at depth&quot;,     100, 0., 0.5*depthMax);
+  }
+
+  // Final particle composition info.
+  map&lt;int, int&gt; finalAng, finalCas;
+
+  // Pythia object for storing and parsing the full atmospheric cascade.
+  // Also for handling Angantyr particle decays.
+  Pythia pythiaMain;
+  Event&amp; eventMain = pythiaMain.event;
+  // Prepare to do decays but no hard processes.
+  pythiaMain.readString(&quot;ProcessLevel:all = off&quot;);
+  pythiaMain.readString(&quot;211:mayDecay = on&quot;);
+  pythiaMain.readString(&quot;13:mayDecay  = on&quot;);
+  pythiaMain.readString(&quot;321:mayDecay = on&quot;);
+  pythiaMain.readString(&quot;130:mayDecay = on&quot;);
+
+  // Return error if pythiaMain initialization fails.
+  if (!pythiaMain.init()) return 1;
+
+  // Four-momentum of baseline incoming initiator proton.
+  double pxPri = 0.;
+  double pyPri = pPri * sin(zenithAngle);
+  double pzPri = pPri * cos(zenithAngle);
+  Vec4 p0p(pxPri, pyPri, -pzPri, sqrt(pow2(pPri) + pow2(mp)));
+  Vec4 p0n(pxPri, pyPri, -pzPri, sqrt(pow2(pPri) + pow2(mn)));
+
+  // Scale up for incoming nucleus.
+  int idnuc = 1000000000 + 10000 * Znuc + 10 * Anuc;
+  double mnuc = pythiaMain.particleData.m0( idnuc);
+  Vec4 p0nuc( Anuc * pxPri, Anuc * pyPri, -Anuc * pzPri,
+    sqrt( pow2(Anuc * pPri) + pow2(mnuc) ) );
+
+  // Scale up p for comparison with A.
+  Vec4 p0pA( Anuc * pxPri, Anuc * pyPri, -Anuc * pzPri,
+    sqrt( pow2(Anuc * pPri) + pow2(mp) ) );
+
+  // Commonly reused variables.
+  bool   canDecayNow, mustDecayNow;
+  int    idNow, idTarg, Ztarg, Atarg;
+  double mNow, eNow, sigmaN, sigmaO, sigmaAr, sigmaPick, sigmaNow,
+         zNow, dzds, logR, zNext;
+  Vec4   pNow, vDec, vInt, dirNow, pSumAll[nCases];
+  clock_t timeBeg, timeEnd;
+  double timeSec[nCases];
+
+  // Pythia object for performing individual Angantyr collisions with
+  // the new strategy also for low energy collisions.
+  Pythia pythiaAng;
+
+  // Enable Angantyr. Reuse deault MPI and cross sections
+  // initialization files. (If alternative parameters are needed these
+  // files can be generate by running main424.)
+  pythiaAng.readString(&quot;include = setups/AngantyrCascade.cmnd&quot;);
+  // Set up for fixed-target collisions.
+  pythiaAng.readString(&quot;Beams:frameType = 3&quot;);
+  pythiaAng.settings.parm(&quot;Beams:pzA&quot;, -pPri);
+  pythiaAng.readString(&quot;Beams:pzB = 0.&quot;);
+  // Decays to be done by pythiaMain except for extremely short-lived hadrons.
+  pythiaAng.readString(&quot;HadronLevel:Decay = on&quot;);
+  pythiaAng.settings.flag(&quot;ParticleDecays:limitTau0&quot;, true);
+  pythiaAng.settings.parm(&quot;ParticleDecays:tau0Max&quot;, 1.0e-10);
+  // Reduce printout and relax energy-momentum conservation.
+  pythiaAng.readString(&quot;Print:quiet = on&quot;);
+  pythiaAng.readString(&quot;Check:epTolErr = 0.1&quot;);
+  // Switch on the new new cascade mode.
+  pythiaAng.readString(&quot;HeavyIon:eCMLowEnergy = 20&quot;);
+  pythiaAng.settings.mvec(&quot;Angantyr:cascadeMediumIons&quot;, mediumIons);
+  pythiaAng.readString(&quot;SoftQCD:all = on&quot;);
+  pythiaAng.readString(&quot;LowEnergyQCD:all = on&quot;);
+
+  // Return error if pythiaAng initialization fails.
+  if (!pythiaAng.init()) return 1;
+
+  // Normalization factor to get cross section per nucleon.
+  double sigmaNorm = 0.0;
+  for ( size_t i = 0; i &lt; mediumIons.size(); ++i )
+    sigmaNorm += mediumFracs[i]*((mediumIons[i]/10)%1000);
+
+  // PythiaCas object for performing individual PythiaCascade collisions.
+  PythiaCascade pythiaCas;
+
+  // See PythiaCascade.h for full list and explanation of options.
+  // Only the first value deviates from default.
+  double eKinMinCas         = eKinMin;
+  double enhanceSDtargetCas = 0.5;
+  string initFileCas        = &quot;setups/InitDefaultMPI.cmnd&quot;;
+
+  // Return error if PythiaCas initialization fails.
+  if (!pythiaCas.init( eKinMinCas, enhanceSDtargetCas, initFileCas)) return 1;
+
+  // Begin loop over two beam options.
+  for (int iCase = 0; iCase &lt; nCases; ++iCase) {
+    timeBeg = clock();
+    cout &lt;&lt; &quot;Starting &quot; &lt;&lt; legend[iCase] &lt;&lt; &quot; run...&quot; &lt;&lt; endl;
+    ProgressLog logger(nEvent);
+
+//========== Event generation ==========
+
+    // Begin event loop. Clear main event record.
+    for (int iEvent = 0; iEvent &lt; nEvent; logger(++iEvent)) {
+      eventMain.clear();
+
+      // Insert p projectile in event record.
+      if (comparison == 1) {
+        eventMain.append(90,  -11, 0, 0, 1, 1, 0, 0, p0p, mp);
+        eventMain.append(2212, 12, 0, 0, 0, 0, 0, 0, p0p, mp);
+
+      // Insert a nuclear projectile projectile.
+      } else if (iCase == 0) {
+        eventMain.append(90,   -11, 0, 0, 1, 1, 0, 0, p0nuc, mnuc);
+        eventMain.append(idnuc, 12, 0, 0, 0, 0, 0, 0, p0nuc, mnuc);
+
+      // Insert A separate proton/neutron projectiles.
+      } else if (comparison == 2 || comparison == 3) {
+        eventMain.append(90,  -11, 0, 0, 1, 1, 0, 0,
+          Znuc * p0p + (Anuc - Znuc) * p0n, Znuc * mp + (Anuc - Znuc) * mn);
+        for (int iProj = 1; iProj &lt;= Anuc; ++iProj) {
+          if (iProj &lt;= Znuc)
+               eventMain.append(2212, 12, 0, 0, 0, 0, 0, 0, p0p, mp);
+          else eventMain.append(2112, 12, 0, 0, 0, 0, 0, 0, p0n, mn);
+        }
+
+      // Insert a p with A times higher momentum.
+      } else {
+        eventMain.append(90,  -11, 0, 0, 1, 1, 0, 0, p0pA, mp);
+        eventMain.append(2212, 12, 0, 0, 0, 0, 0, 0, p0pA, mp);
+      }
+
+      // Set initial location of initiator, where z is distance above ground.
+      double yProd = -mediumHeight * tan(zenithAngle);
+      double zProd = mediumHeight;
+      for (int iProj = 0; iProj &lt; eventMain.size(); ++iProj) {
+        eventMain[iProj].yProd(yProd);
+        eventMain[iProj].zProd(zProd);
+      }
+
+      // Loop over particles (usually hadrons) in the main event record.
+      for (int iHad = 1; iHad &lt; eventMain.size(); ++iHad) {
+        Particle&amp; hadNow = eventMain[iHad];
+
+        // Skip already fragmented/decayed or upwards-moving particles.
+        if (!hadNow.isFinal() || hadNow.pz() &gt; 0.) continue;
+
+        //  Projectile properties. Invariant mass  with a p/n nucleon at rest.
+        idNow        = hadNow.id();
+        pNow         = hadNow.p();
+        mNow         = hadNow.m();
+        eNow         = hadNow.e();
+        mustDecayNow = false;
+
+        // For nuclear projectile rescale to single nucleon
+        if ( abs(idNow) &gt; 1000000000 ) {
+          int ANow = (abs(idNow)/10)%1000;
+          eNow /= ANow;
+          pNow /= ANow;
+          mNow /= ANow;
+        }
+
+        // Find decay vertex for unstable hadrons. (Below ground if no decay.)
+        canDecayNow = hadNow.canDecay() &amp;&amp; hadNow.mayDecay();
+        vDec = canDecayNow ? hadNow.vDec() : Vec4( 0., 0., -1., 0.);
+        if (vDec.pz() &lt; 0.) canDecayNow = false;
+
+        // Non-hadronic and low-energy hadrons should not interact with medium.
+        // Decay non-hadronic or low-energy ones if decay happens above ground.
+        if ( (!hadNow.isHadron() &amp;&amp; idNow &lt; 1000000000)
+          || eNow - mNow &lt; eKinMin) {
+          if (canDecayNow) mustDecayNow = true;
+          else continue;
+        }
+
+        // Get hadron-nucleus cross sections and pick interaction vertex.
+        if (!mustDecayNow) {
+
+          // Begin Angantyr handling.
+          if (iCase == 0 ||
+             (iCase == 1 &amp;&amp; ((comparison == 3) || (comparison == 5)))) {
+
+            // First let Angantyr know about the beam and its energy.
+            // The first round of setBeamIDs and setKinematics with a
+            // light hadron helps avoid vanishing inelastic cross section.
+            pythiaAng.setBeamIDs(211, 0);
+            pythiaAng.setKinematics(pNow, Vec4(0., 0., 0., 0.));
+            if ( !pythiaAng.setBeamIDs(idNow, 0)
+              || !pythiaAng.setKinematics(pNow, Vec4(0., 0., 0., 0.)) ) {
+              if (canDecayNow) mustDecayNow = true;
+              else continue;
+            }
+
+            if (!mustDecayNow) {
+              // Get hadron-ion cross sections, corrected by fractions,
+              // and normalised to cross section per nucleon.
+              // (Atmosphere medium density is nucleons per volume.)
+              vector&lt;double&gt; crossSections
+                = pythiaAng.info.hiInfo-&gt;mediumXSecs();
+              sigmaNow = 0.0;
+              for ( size_t i = 0; i &lt; mediumFracs.size(); ++i )
+                sigmaNow += (crossSections[i] *= mediumFracs[i]/sigmaNorm);
+
+              // Get info about projetile
+              dirNow = pNow / pNow.pAbs();
+              zNow  = hadNow.zProd();
+              dzds  = hadNow.pz() / hadNow.pAbs();
+              vInt = hadNow.vProd();
+
+              // Accept/reject loop to handle overestimated cross sections
+              // in Angantyr.
+              idTarg = 0;
+              while ( !idTarg ) {
+
+                // Calculate potential interaction vertex.
+                logR  = log(pythiaAng.rndm.flat());
+                zNext = -H * log( exp(-zNow / H)
+                      + dzds / (H * sigmaNow * mediumDensity) * logR );
+                vInt += (zNext - zNow) * dirNow / dzds;
+                zNow  = zNext;
+
+                // Done if hadron reaches surface before both interaction
+                // and decay.
+                if (vInt.pz() &lt; 0. &amp;&amp; !canDecayNow) break;
+
+                // Do decay if it happens first.
+                if (canDecayNow &amp;&amp; vDec.pz() &gt; vInt.pz()) {
+                  mustDecayNow = true;
+                  break;
+                }
+
+                // Now try to pick a nucleus according to the relative
+                // overestimated cross section and do a collision.
+                // Accept/reject to get the correct cross section.
+                idTarg = mediumIons[pythiaAng.rndm.pick(crossSections)];
+                if (!pythiaAng.setBeamIDs(idNow, idTarg) || !pythiaAng.next())
+                  idTarg = 0;
+              }
+            }
+
+            // Prepare for next step.
+            if ( !idTarg &amp;&amp; !mustDecayNow ) continue;
+            Ztarg = (idTarg / 10000) % 100;
+            Atarg = (idTarg / 10) % 1000;
+
+          // Begin PythiaCascade handling. Skip if vanishing cross section.
+          } else {
+            if (!pythiaCas.sigmaSetuphN( idNow, pNow, mNow)) {
+              if (canDecayNow) mustDecayNow = true;
+              else continue;
+            }
+
+            if (!mustDecayNow) {
+              // Get hadron-ion cross sections, corrected by fractions.
+              sigmaN  = fracN  * pythiaCas.sigmahA(14);
+              sigmaO  = fracO  * pythiaCas.sigmahA(16);
+              sigmaAr = fracAr * pythiaCas.sigmahA(40);
+
+              // Pick nucleus by relative cross sections.
+              sigmaPick = (sigmaN + sigmaO + sigmaAr)*pythiaCas.rndm().flat();
+              if (sigmaPick &lt; sigmaN)               idTarg = 1000070140;
+              else if (sigmaPick &lt; sigmaN + sigmaO) idTarg = 1000080160;
+              else                                  idTarg = 1000180400;
+              Ztarg = (idTarg / 10000) % 100;
+              Atarg = (idTarg / 10) % 1000;
+
+              // Atmosphere medium density is nucleons per volume (not nuclei),
+              // so need cross section per nucleon.
+              sigmaNow = (sigmaN + sigmaO + sigmaAr)
+                       / (fracN * 14. + fracO * 16. + fracAr * 40.);
+
+              // Calculate potential interaction vertex.
+              dirNow = pNow / pNow.pAbs();
+              zNow  = hadNow.zProd();
+              dzds  = hadNow.pz() / hadNow.pAbs();
+              logR  = log(pythiaCas.rndm().flat());
+              zNext = -H * log( exp(-zNow / H)
+                    + dzds / (H * sigmaNow * mediumDensity) * logR );
+              vInt  = hadNow.vProd() + (zNext - zNow) * dirNow / dzds;
+
+              // Done if hadron reaches surface before both interaction
+              // and decay.
+              if (vInt.pz() &lt; 0. &amp;&amp; !canDecayNow) continue;
+
+              // Do decay if it happens first.
+              if (canDecayNow &amp;&amp; vDec.pz() &gt; vInt.pz()) mustDecayNow = true;
+            }
+          }
+        }
+
+        // Handling of decay or interaction with Angantyr.
+        if (iCase == 0 ||
+           (iCase == 1 &amp;&amp; ((comparison == 3) || (comparison == 5)))) {
+
+          // Perform the decay if it happens first.
+          if (mustDecayNow) {
+            // Decay incoming particle. Skip particle on a failure, which
+            // could lead to unintended punch-through of a particle.
+            if (!pythiaMain.moreDecays(iHad)) continue;
+
+          // Perform interaction if it happens first.
+          } else {
+            Event &amp; eventTmp = pythiaAng.event;
+
+            // Append target.
+            int iTarg = eventMain.append(idTarg, -181, iHad, iHad, 0, 0, 0, 0,
+                0., 0., 0., mp, mp);
+            eventMain[iTarg].vProdAdd(vInt);
+
+            // Copy final-state particles.
+            int sizeOld = eventMain.size();
+            for (int iSub = 3; iSub &lt; eventTmp.size(); ++iSub) {
+              if (eventTmp[iSub].isFinal()) {
+                int idNew = eventTmp[iSub].idAbs();
+                if ( idNew/100000000 == 10 &amp;&amp; idNew%10 == 9 ) {
+                  int ZNew = (idNew/10000)%1000;
+                  pythiaMain.particleData.addParticle
+                    (idNew, &quot;NucRem&quot;, 0, 3*ZNew, 0, eventTmp[iSub].mCalc());
+                  pythiaMain.particleData.particleDataEntryPtr(idNew)-&gt;
+                    setHasChanged(false);
+                }
+                int iNew = eventMain.append(eventTmp[iSub]);
+                eventMain[iNew].mothers(iHad, iTarg);
+                eventMain[iNew].vProdAdd(vInt);
+              }
+            }
+
+            // Update daughters of the interacting particles.
+            int sizeNew = eventMain.size();
+            eventMain[iTarg].daughters(sizeOld, sizeNew - 1);
+            eventMain[iHad].daughters(sizeOld, sizeNew - 1);
+            eventMain[iHad].statusNeg();
+            eventMain[iHad].tau(( vInt.e() - eventMain[iHad].tProd() ) * mNow
+              / eNow);
+
+            // Fill histogram.
+            eKinColl[iCase].fill(eNow - mNow);
+          }
+
+        // Handling of decay or interaction with PythiaCascade.
+        } else {
+
+          // Do decay or collision. Empty event means failure, so skip,
+          // which could lead to unintended punch-through of a particle.
+          int sizeSave    = eventMain.size();
+          Event&amp; eventTmp = (mustDecayNow)
+                          ? pythiaCas.nextDecay(idNow, pNow, mNow, vDec)
+                          : pythiaCas.nextColl( Ztarg, Atarg, vInt);
+          if (eventTmp.size() == 0) continue;
+
+          // Update properties of incoming hadron,
+          // including invariant lifetime.
+          hadNow.statusNeg();
+          hadNow.daughters( sizeSave, sizeSave);
+          double dTau = ( (mustDecayNow ? vDec.e() : vInt.e())
+            - hadNow.tProd() ) * mNow / eNow;
+          hadNow.tau( dTau);
+
+          // Append new event to existing and link history.
+          eventMain += eventTmp;
+          eventMain[sizeSave].mothers( iHad, iHad);
+
+          // Fill histogram.
+          if (!mustDecayNow) eKinColl[iCase].fill(eNow - mNow);
+
+        }
+
+        // Stop generation if event record is extremely long.
+        if (checkSize &amp;&amp; eventMain.size() &gt; maxSize) {
+          cout &lt;&lt; &quot;\n Error: the event record has now reached a size of &quot;
+               &lt;&lt; eventMain.size() &lt;&lt; &quot;,&quot; &lt;&lt; endl
+               &lt;&lt; &quot;            which is bigger than the maxSize value &quot;
+               &lt;&lt; maxSize &lt;&lt; &quot;.&quot; &lt;&lt; endl
+               &lt;&lt; &quot; Likely there are unfragmented partons and/or undecayed &quot;
+               &lt;&lt; &quot;particles.&quot; &lt;&lt; endl
+               &lt;&lt; &quot; Feel free to increase the maxSize value when relevant.&quot;
+               &lt;&lt; endl;
+          break;
+        }
+
+      // End of loop over interactions + decays inside a single cascade.
+      }
+
+//========== Event analysis ==========
+
+      // Begin analysis: loop over all particles.
+      eventSize[iCase].fill(eventMain.size());
+      eMaxEMnow[iCase].null();
+      Vec4 pSumEvt;
+      int nNucInit = (iCase == 1 &amp;&amp; ((comparison == 2) || (comparison == 3)))
+        ? Anuc : 1;
+      for (Particle&amp; h : eventMain) {
+
+        // Tag higher-energy particles. Production and decay depth X.
+        bool highKin = (h.e() - h.m() &gt; eKinMinHist);
+        double depthProd = getDepth(h.zProd());
+        double depthDec  = getDepth(h.isFinal() ? 0. : h.zDec());
+
+        // If particle came from the medium, record the interaction depth.
+        if (h.status() == -181) {
+          nInt[iCase].fill(depthProd);
+          continue;
+        }
+
+        // Restrict to downwards-moving particles.
+        if ( (h.status() == -12 &amp;&amp; h.index() &gt; nNucInit) || h.pz() &gt; -0.01)
+          continue;
+        if (h.isFinal()) pSumEvt += h.p();
+
+        // Kinetic energy of nucleons.
+        if ( h.id() == 2212 || h.id() == 2112 ) {
+          nucleonEnergy[iCase].fill(h.e() - h.m());
+          if ( h.isFinal() )
+            finalNucleonEnergy[iCase].fill(h.e() - h.m());
+        }
+
+        // Track depths where particles are created/destroyed ...
+
+        // ... nuclei.
+        if (h.id() &gt; 1000000000) {
+          if (h.isFinal()) {
+            eDepthNuc[iCase].fill(depthProd, h.pz());
+          } else {
+            eDepthNuc[iCase].fill(min(depthProd, depthDec), h.pz());
+            eDepthNuc[iCase].fill(max(depthProd, depthDec), -h.pz());
+         }
+
+        // ... hadrons.
+        } else if (h.isHadron()) {
+          if (h.isFinal()) {
+            diffHadA[iCase].fill(depthProd, 1.);
+            if (highKin) diffHadS[iCase].fill(depthProd, 1.);
+            eDepthHad[iCase].fill(depthProd, h.pz());
+          } else {
+            diffHadA[iCase].fill(min(depthProd, depthDec), 1.);
+            if (highKin) diffHadS[iCase].fill(min(depthProd, depthDec), 1.);
+            eDepthHad[iCase].fill(min(depthProd, depthDec), h.pz());
+            diffHadA[iCase].fill(max(depthProd, depthDec), -1.);
+            if (highKin) diffHadS[iCase].fill(max(depthProd, depthDec), -1.);
+            eDepthHad[iCase].fill(max(depthProd, depthDec), -h.pz());
+          }
+
+        // ... electrons and photons.
+        } else if (h.idAbs() == 11 || h.idAbs() == 22) {
+          if (h.isFinal()) {
+            eDepthEM[iCase].fill(depthProd, h.pz());
+            eMaxEMnow[iCase].fill(depthProd, h.e());
+          } else {
+            eDepthEM[iCase].fill(min(depthProd, depthDec), h.pz());
+            eDepthEM[iCase].fill(max(depthProd, depthDec), -h.pz());
+            eMaxEMnow[iCase].fill(min(depthProd, depthDec), h.e());
+            eMaxEMnow[iCase].fill(max(depthProd, depthDec), -h.e());
+          }
+
+        // ... muons.
+        } else if (h.idAbs() == 13) {
+          if (h.isFinal()) {
+            rateMuonP[iCase].fill(depthProd, 1.);
+            diffMuonA[iCase].fill(depthProd, 1.);
+            if (highKin) diffMuonS[iCase].fill(depthProd, 1.);
+            eDepthMu[iCase].fill(depthProd, h.pz());
+          } else {
+            rateMuonP[iCase].fill(min(depthProd, depthDec), 1.);
+            rateMuonD[iCase].fill(max(depthProd, depthDec), 1.);
+            diffMuonA[iCase].fill(min(depthProd, depthDec), 1.);
+            if (highKin) diffMuonS[iCase].fill(min(depthProd, depthDec), 1.);
+            eDepthMu[iCase].fill(min(depthProd, depthDec), h.pz());
+            diffMuonA[iCase].fill(max(depthProd, depthDec), -1.);
+            if (highKin) diffMuonS[iCase].fill(max(depthProd, depthDec), -1.);
+            eDepthMu[iCase].fill(max(depthProd, depthDec), -h.pz());
+          }
+
+        // ... neutrinos: electron and muon kinds.
+        } else if (h.idAbs() == 12) {
+          prodnueA[iCase].fill(depthProd, 1.);
+          if (highKin) prodnueS[iCase].fill(depthProd, 1.);
+          eDepthNu[iCase].fill(depthProd, h.pz());
+        } else if (h.idAbs() == 14) {
+          prodnumuA[iCase].fill(depthProd, 1.);
+          if (highKin) prodnumuS[iCase].fill(depthProd, 1.);
+          eDepthNu[iCase].fill(depthProd, h.pz());
+        }
+
+        // Particle composition, neglecting upwards moving ones.
+        if (h.isFinal() &amp;&amp; h.pz() &lt; 0.) {
+          if (iCase == 0) finalAng[h.idAbs()] += 1;
+          if (iCase == 1) finalCas[h.idAbs()] += 1;
+        }
+      }
+
+      // Find maximum of EM energy production.
+      int binMax   = 0;
+      double pzMax = 0.;
+      for (int bin = 1; bin &lt;= 100; ++bin) {
+        double pzNow = eMaxEMnow[iCase].getBinContent(bin);
+        if (pzNow &gt; pzMax) {
+          binMax = bin;
+          pzMax  = pzNow;
+        }
+      }
+      double depthMaxEM = eMaxEMnow[iCase].getBinCenter(binMax);
+      eMaxEM[iCase].fill( depthMaxEM, 1.);
+      double depthAvgEM = eMaxEMnow[iCase].getXMean();
+      eAvgEM[iCase].fill( depthAvgEM, 1.);
+
+      // End loops over events and over Angantyr/PythiaCascade cases.
+      pSumAll[iCase] += pSumEvt;
+    }
+    timeEnd = clock();
+    timeSec[iCase] = double(timeEnd - timeBeg) / double(CLOCKS_PER_SEC);
+  }
+
+//========== Final statistics and histograms ==========
+
+  // Print time.
+  cout &lt;&lt; &quot; \n Runtime for &quot; &lt;&lt; legend[0] &lt;&lt; &quot; events is &quot; &lt;&lt; fixed
+       &lt;&lt; setprecision(3) &lt;&lt; timeSec[0] &lt;&lt; &quot; s&quot; &lt;&lt; endl
+       &lt;&lt; &quot; Runtime for &quot; &lt;&lt; legend[1] &lt;&lt; &quot; events is &quot; &lt;&lt; timeSec[1] &lt;&lt; &quot; s&quot;
+       &lt;&lt; endl;
+
+  // Print particle production statistics.
+  cout &lt;&lt; &quot;\n Final particle composition in &quot; &lt;&lt; legend[0] &lt;&lt; &quot;: &quot; &lt;&lt; endl;
+  for (const auto&amp; entry : finalAng)
+    cout &lt;&lt; setw(12) &lt;&lt; entry.first &lt;&lt; setw(12) &lt;&lt; entry.second &lt;&lt; endl;
+  cout &lt;&lt; &quot;\n Final particle composition in &quot; &lt;&lt; legend[1] &lt;&lt; &quot;: &quot; &lt;&lt; endl;
+  for (const auto&amp; entry : finalCas)
+    cout &lt;&lt; setw(12) &lt;&lt; entry.first &lt;&lt; setw(12) &lt;&lt; entry.second &lt;&lt; endl;
+
+  // Print statistics, mainly for errors.
+  cout &lt;&lt; &quot;\n Statistics from PythiaMain: &quot; &lt;&lt; endl;
+  pythiaMain.stat();
+  cout &lt;&lt; &quot;\n Statistics from PythiaAng: &quot; &lt;&lt; endl;
+  pythiaAng.stat();
+  cout &lt;&lt; &quot;\n Statistics from PythiaCas: &quot; &lt;&lt; endl;
+  pythiaCas.stat();
+
+  // Integrate and normalize histograms.
+  for (int iC = 0; iC &lt; nCases; ++iC) {
+
+    // Integrate relevant histograms.
+    diffHadA[iC].makeCumulative();
+    diffHadS[iC].makeCumulative();
+    diffMuonA[iC].makeCumulative();
+    diffMuonS[iC].makeCumulative();
+    prodnueA[iC].makeCumulative();
+    prodnueS[iC].makeCumulative();
+    prodnumuA[iC].makeCumulative();
+    prodnumuS[iC].makeCumulative();
+    eDepthNuc[iC].makeCumulative();
+    eDepthHad[iC].makeCumulative();
+    eDepthEM[iC].makeCumulative();
+    eDepthMu[iC].makeCumulative();
+    eDepthNu[iC].makeCumulative();
+
+    // Normalize histograms.
+    nInt[iC].normalizeSpectrum(nEvent);
+    rateMuonP[iC].normalizeSpectrum(nEvent);
+    rateMuonD[iC].normalizeSpectrum(nEvent);
+    diffHadA[iC]  /= nEvent;
+    diffHadS[iC]  /= nEvent;
+    diffMuonA[iC] /= nEvent;
+    diffMuonS[iC] /= nEvent;
+    prodnueA[iC]  /= nEvent;
+    prodnueS[iC]  /= nEvent;
+    prodnumuA[iC] /= nEvent;
+    prodnumuS[iC] /= nEvent;
+    eDepthNuc[iC] /= pSumAll[iC].pz();
+    eDepthHad[iC] /= pSumAll[iC].pz();
+    eDepthEM[iC]  /= pSumAll[iC].pz();
+    eDepthMu[iC]  /= pSumAll[iC].pz();
+    eDepthNu[iC]  /= pSumAll[iC].pz();
+    nucleonEnergy[iC]      /= nEvent;
+    finalNucleonEnergy[iC] /= nEvent;
+    eMaxEM[iC] /= nEvent;
+    eAvgEM[iC] /= nEvent;
+  }
+
+  // Plot histograms. Symbols and (parts of) legends.
+  HistPlot plt(&quot;plot487&quot;);
+  vector&lt;string&gt; col = { &quot;black&quot;, &quot;r&quot;, &quot;b&quot;, &quot;g&quot;};
+  vector&lt;string&gt; ecol = { &quot;blue&quot;, &quot;magenta&quot;, &quot;b&quot;, &quot;g&quot;};
+  stringstream eKinstream;
+  eKinstream &lt;&lt; &quot; $E_{\\mathrm{kin}} &gt; $&quot; &lt;&lt; fixed &lt;&lt; setprecision(1)
+    &lt;&lt; eKinMinHist &lt;&lt; &quot; GeV&quot;;
+  string eKinstring = eKinstream.str();
+  stringstream qualifierstream;
+  qualifierstream &lt;&lt; &quot;-&quot; &lt;&lt; comparison &lt;&lt; &quot;-&quot; &lt;&lt; scientific &lt;&lt; setprecision(0)
+    &lt;&lt; pPri &lt;&lt; &quot;-&quot; &lt;&lt; nEvent;
+  string qualifier = qualifierstream.str();
+
+  // Common vertical scale. Rescale from per-nucleon to full energy.
+  double scaleLo = min( 2. * sqrt(pPri / 1e6), 2. * pPri / 1e6);
+  double scaleHi = (pPri &lt; 0.5e6) ? 2. * pPri / 1e6 : pPri / 1e6;
+  if (comparison &gt; 1) {
+    scaleLo *= Anuc;
+    scaleHi *= Anuc;
+  }
+
+  // Nuclear interaction rate.
+  plt.frame(&quot;fig487&quot; + qualifier, &quot;Atmospheric depth of nuclear interactions &quot;,
+    &quot;$X$ (g/cm$^2$)&quot;, &quot;$(1/n_{ev}) dn_{int}/dX$&quot;, 6.4, 4.8);
+  for (int iC = 0; iC &lt; nCases; ++iC)
+    plt.add(nInt[iC], &quot;-,&quot;+col[iC], legend[iC]);
+  plt.plot( 0., depthMax, 0.05, 100. * scaleHi, true);
+
+  // Current hadron number.
+  plt.frame(&quot;&quot;, &quot;Number of hadrons at depth &quot;,
+    &quot;$X$ (g/cm$^2$)&quot;, &quot;$(1/n_{ev}) \\int_0^{X} dn_{had}$&quot;, 6.4, 4.8);
+  for (int iC = 0; iC &lt; nCases; ++iC)
+    plt.add(diffHadA[iC], &quot;-,&quot;+col[iC], legend[iC] + &quot; all&quot;);
+  for (int iC = 0; iC &lt; nCases; ++iC)
+    plt.add(diffHadS[iC], &quot;--,&quot;+col[iC], legend[iC] + eKinstring);
+  plt.plot( 0., depthMax, 5. * scaleLo, 100000. * scaleHi, true);
+
+  // Muon production and decay.
+  plt.frame(&quot;&quot;, &quot;Rate of muon production and decay at depth &quot;,
+    &quot;$X$ (g/cm$^2$)&quot;, &quot;$(1/n_{ev})  dn_{\\mu}/dX$&quot;, 6.4, 4.8);
+  for (int iC = 0; iC &lt; nCases; ++iC)
+    plt.add(rateMuonP[iC], &quot;-,&quot;+col[iC], legend[iC] + &quot; production&quot;);
+  for (int iC = 0; iC &lt; nCases; ++iC)
+    plt.add(rateMuonD[iC], &quot;--,&quot;+col[iC], legend[iC] + &quot; decay&quot;);
+  plt.plot( 0., depthMax, 0.2 * scaleLo, 200. * scaleHi, true);
+
+  // Net muon number.
+  plt.frame(&quot;&quot;, &quot;Number of muons at depth &quot;,
+    &quot;$X$ (g/cm$^2$)&quot;, &quot;$(1/n_{ev}) \\int_0^{X} dn_{\\mu}$&quot;, 6.4, 4.8);
+  for (int iC = 0; iC &lt; nCases; ++iC)
+    plt.add(diffMuonA[iC], &quot;-,&quot;+col[iC], legend[iC] + &quot; all&quot;);
+  for (int iC = 0; iC &lt; nCases; ++iC)
+    plt.add(diffMuonS[iC], &quot;--,&quot;+col[iC], legend[iC] + eKinstring);
+  plt.plot( 0., depthMax, 5. * scaleLo, 20000. * scaleHi, true);
+
+  // Net nu_e number.
+  plt.frame(&quot;&quot;, &quot;Number of e neutrinos at depth &quot;,
+    &quot;$X$ (g/cm$^2$)&quot;, &quot;$(1/n_{ev}) \\int_0^{X} dn_{\\nu_e}$&quot;, 6.4, 4.8);
+  for (int iC = 0; iC &lt; nCases; ++iC)
+    plt.add(prodnueA[iC], &quot;-,&quot;+col[iC], legend[iC] + &quot; all&quot;);
+  for (int iC = 0; iC &lt; nCases; ++iC)
+    plt.add(prodnueS[iC], &quot;--,&quot;+col[iC], legend[iC] + eKinstring);
+  plt.plot( 0., depthMax, 0.2 * scaleLo, 50000. * scaleHi, true);
+
+  // Net nu_mu number.
+  plt.frame(&quot;&quot;, &quot;Number of mu neutrinos at depth &quot;,
+    &quot;$X$ (g/cm$^2$)&quot;, &quot;$(1/n_{ev}) \\int_0^{X} dn_{\\nu_\\mu}$&quot;, 6.4, 4.8);
+  for (int iC = 0; iC &lt; nCases; ++iC)
+    plt.add(prodnumuA[iC], &quot;-,&quot;+col[iC], legend[iC] + &quot; all&quot;);
+  for (int iC = 0; iC &lt; nCases; ++iC)
+    plt.add(prodnumuS[iC], &quot;--,&quot;+col[iC], legend[iC] + eKinstring);
+  plt.plot( 0., depthMax, 5. * scaleLo, 100000. * scaleHi, true);
+
+  // Current nuclei/hadron/EM/mu/nu momentum fractions of the whole.
+  plt.frame(&quot;&quot;, &quot;Momentum fractions at depth &quot;,
+    &quot;$X$ (g/cm$^2$)&quot;, &quot;$(1/n_{ev}) \\int_0^{X} dpz_{had}$&quot;, 6.4, 4.8);
+  for (int iC = 0; iC &lt; nCases; ++iC) {
+    if (comparison &gt; 1 &amp;&amp; iC == 0)
+      plt.add(eDepthNuc[iC], &quot;-,&quot;+ecol[iC], legend[iC] + &quot; nuclei&quot;);
+    plt.add(eDepthHad[iC], &quot;-,&quot;+col[iC],   legend[iC] + &quot; hadrons&quot;);
+    plt.add(eDepthEM[iC], &quot;--,&quot;+col[iC],  legend[iC] + &quot; electrons+photons&quot;);
+    plt.add(eDepthMu[iC], &quot;-.,&quot;+col[iC],  legend[iC] + &quot; muons&quot;);
+    plt.add(eDepthNu[iC], &quot;.,&quot;+col[iC],   legend[iC] + &quot; neutrinos&quot;);
+  }
+  plt.plot(0., depthMax, 1e-3, 1., true, false);
+
+  // Event record size.
+  plt.frame(&quot;&quot;, &quot;Size of the event record &quot;,
+    &quot;$n_{\\mathrm{size}}$&quot;, &quot;Number of events&quot;, 6.4, 4.8);
+  for (int iC = 0; iC &lt; nCases; ++iC)
+    plt.add(eventSize[iC], &quot;h,&quot;+col[iC], legend[iC]);
+  plt.plot();
+
+  // Nucleon energy.
+  plt.frame(&quot;&quot;, &quot;Energy of produced nucleons &quot;,
+    &quot;$E_{nuc}$&quot;, &quot;dN/dE_{nuc}&quot;, 6.4, 4.8);
+  for (int iC = 0; iC &lt; nCases; ++iC)
+    plt.add(nucleonEnergy[iC], &quot;h,&quot;+col[iC], legend[iC]);
+  plt.plot(true);
+  plt.frame(&quot;&quot;, &quot;Energy of final nucleons &quot;,
+    &quot;$E_{nuc}$&quot;, &quot;dN/dE_{nuc}&quot;, 6.4, 4.8);
+  for (int iC = 0; iC &lt; nCases; ++iC)
+    plt.add(finalNucleonEnergy[iC], &quot;h,&quot;+col[iC], legend[iC]);
+  plt.plot(true);
+
+  // Kinetic energy of interacting particles.
+   plt.frame(&quot;&quot;, &quot;Kinetic energy of colliding hadrons &quot;,
+    &quot;$E_{had}$&quot;, &quot;$dN/dE_{had}$&quot;, 6.4, 4.8);
+  for (int iC = 0; iC &lt; nCases; ++iC)
+    plt.add(eKinColl[iC], &quot;h,&quot;+col[iC], legend[iC]);
+  plt.plot();
+
+  if (comparison &gt; 1) {
+    // Depth of maximum EM energy production.
+    plt.frame(&quot;&quot;, &quot;Depth of maximum EM energy production &quot;,
+      &quot;$X_{\\mathrm{max}}$ (g/cm$^2$)&quot;, &quot;$P(X_{\\mathrm{max}})$&quot;, 6.4, 4.8);
+    for (int iC = 0; iC &lt; nCases; ++iC)
+      plt.add(eMaxEM[iC], &quot;h,&quot;+col[iC], legend[iC]);
+    plt.plot();
+    plt.frame(&quot;&quot;, &quot;Depth of average EM energy production &quot;,
+      &quot;$X_{\\mathrm{avg}}$ (g/cm$^2$)&quot;, &quot;$P(X_{\\mathrm{avg}})$&quot;, 6.4, 4.8);
+    for (int iC = 0; iC &lt; nCases; ++iC)
+      plt.add(eAvgEM[iC], &quot;h,&quot;+col[iC], legend[iC]);
+    plt.plot();
+  }
+
+  // From now detached figures, e.g. for inclusion in article.
+  if (separateFigs) {
+
+    // Nuclear interaction rate.
+    plt.frame(&quot;fig487a&quot; + qualifier, &quot;&quot;, &quot;$X$ (g/cm$^2$)&quot;,
+    &quot;$(1/n_{\\mathrm{ev}}) \\mathrm{d}n_{\\mathrm{int}}/dX$&quot;, 4.8, 4.8);
+    for (int iC = 0; iC &lt; nCases; ++iC)
+      plt.add(nInt[iC], &quot;-,&quot;+col[iC], legend[iC]);
+    plt.plot( 0., depthMax, 0.05, 100. * scaleHi, true);
+
+    // Current hadron number.
+    plt.frame(&quot;fig487b&quot; + qualifier, &quot;&quot;, &quot;$X$ (g/cm$^2$)&quot;,
+    &quot;$(1/n_{\\mathrm{ev}}) \\int_0^{X} \\mathrm{d}n_{\\mathrm{had}}$&quot;,
+      4.8, 4.8);
+    for (int iC = 0; iC &lt; nCases; ++iC)
+      plt.add(diffHadA[iC], &quot;-,&quot;+col[iC], legend[iC] + &quot; all&quot;);
+    for (int iC = 0; iC &lt; nCases; ++iC)
+      plt.add(diffHadS[iC], &quot;--,&quot;+col[iC], legend[iC] + eKinstring);
+    plt.plot( 0., depthMax, 5. * scaleLo, 100000. * scaleHi, true);
+
+    // Muon production and decay.
+    plt.frame(&quot;fig487c&quot; + qualifier, &quot;&quot;, &quot;$X$ (g/cm$^2$)&quot;,
+      &quot;$(1/n_{\\mathrm{ev}}) \\int_0^{X} \\mathrm{d}n_{\\mu}$&quot;, 4.8, 4.8);
+    for (int iC = 0; iC &lt; nCases; ++iC)
+      plt.add(rateMuonP[iC], &quot;-,&quot;+col[iC], legend[iC] + &quot; production&quot;);
+    for (int iC = 0; iC &lt; nCases; ++iC)
+      plt.add(rateMuonD[iC], &quot;--,&quot;+col[iC], legend[iC] + &quot; decay&quot;);
+    plt.plot( 0., depthMax, 0.2 * scaleLo, 200. * scaleHi, true);
+
+    // Net muon number.
+    plt.frame(&quot;fig487d&quot; + qualifier, &quot;&quot;, &quot;$X$ (g/cm$^2$)&quot;,
+      &quot;$(1/n_{\\mathrm{ev}}) \\int_0^{X} \\mathrm{d}n_{\\mu}$&quot;, 4.8, 4.8);
+    for (int iC = 0; iC &lt; nCases; ++iC)
+      plt.add(diffMuonA[iC], &quot;-,&quot;+col[iC], legend[iC] + &quot; all&quot;);
+    for (int iC = 0; iC &lt; nCases; ++iC)
+      plt.add(diffMuonS[iC], &quot;--,&quot;+col[iC], legend[iC] + eKinstring);
+    plt.plot( 0., depthMax, 5. * scaleLo, 20000. * scaleHi, true);
+
+    // Current nuclei/hadron/EM/mu/nu momentum fraction of the whole.
+    plt.frame(&quot;fig487e&quot; + qualifier, &quot;&quot;, &quot;$X$ (g/cm$^2$)&quot;,
+      &quot;$p_{z,\\mathrm{kind}}(X) / p_{z,\\mathrm{tot}}$&quot;, 4.8, 4.8);
+    for (int iC = 0; iC &lt; nCases; ++iC) {
+      if (comparison &gt; 1 &amp;&amp; iC == 0)
+        plt.add(eDepthNuc[iC], &quot;-,&quot;+ecol[iC], legend[iC] + &quot; nuclei&quot;);
+      plt.add(eDepthHad[iC], &quot;-,&quot;+col[iC],  legend[iC] + &quot; hadrons&quot;);
+      plt.add(eDepthEM[iC], &quot;--,&quot;+col[iC],  legend[iC] + &quot; electrons+photons&quot;);
+      plt.add(eDepthMu[iC], &quot;-.,&quot;+col[iC],  legend[iC] + &quot; muons&quot;);
+      plt.add(eDepthNu[iC], &quot;.,&quot;+col[iC],   legend[iC] + &quot; neutrinos&quot;);
+    }
+    plt.plot(0., depthMax, 1e-3, 1., true, false);
+
+    // Depth of maximum EM energy production.
+    plt.frame(&quot;fig487f&quot; + qualifier, &quot;&quot;,
+      &quot;$X_{\\mathrm{avg}}$ (g/cm$^2$)&quot;, &quot;$P(X_{\\mathrm{avg}})$&quot;, 4.8, 4.8);
+    for (int iC = 0; iC &lt; nCases; ++iC)
+      plt.add(eAvgEM[iC], &quot;h,&quot;+col[iC], legend[iC]);
+    plt.plot();
+  }
+}
+</code></pre></body></html>

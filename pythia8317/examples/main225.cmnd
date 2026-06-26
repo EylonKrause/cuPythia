@@ -1,0 +1,49 @@
+! Set the beams.
+Beams:idA = 11
+Beams:idB = -11
+Beams:eCM = 91.189
+PDF:lepton = off
+
+! Set the process.
+WeakSingleBoson:ffbar2gmZ = on
+23:onMode = off
+23:onIfAny = 1 2 3 4 5
+
+! Configure Rivet.
+Init:plugins = {libpythia8rivet.so::RivetHooks}
+Rivet:analyses = {ALEPH_1996_I428072}
+
+! Additional optional Rivet configuration.
+! Rivet:preloads = {}       ! YODA files to preload.
+! Rivet:dumpName = NAME     ! File name to dump the analysis for debugging.
+! Rivet:dumpPeriod = NUMBER ! Dumping frequency, by default off.
+! Rivet:checkBeams = off      ! Flag to check the beams.
+Rivet:skipZeroWeights = on  ! Flag to skip events with zero weights.
+
+! Configure HepMC3.
+! The `::add` suffix adds this as a `UserHooks` plugin, rather than replacing
+! the `RivetHooks` plugin.
+Init:plugins += {libpythia8hepmc3.so::HepMC3Hooks::add}
+
+! Additional optional HepMC3 configuration.
+HepMC:fileName = events.hepmc    ! HepMC output file name.
+HepMC:printInconsistency = true  ! Warn if there are inconsistencies.
+HepMC:freePartonWarnings = true  ! Warn if there are final partons.
+HepMC:storePDF = true            ! Flag to store the PDF information.
+HepMC:storeProcess = true        ! Flag to store the process information.
+
+! Set the run.
+Main:numberOfEvents = 100000
+
+! Assume no additional analysis, so asynchronous running.
+Parallelism:processAsync = on
+
+! Define the Rivet output for the parallel run.
+Main:subrun = 0
+Rivet:fileName = main225Parallel.yoda
+HepMC:filename = main225Parallel.hepmc
+
+! Define the Rivet output for the single run.
+Main:subrun = 1
+Rivet:fileName = main225Single.yoda
+HepMC:filename = main225Single.hepmc
