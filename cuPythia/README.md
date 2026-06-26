@@ -1,4 +1,4 @@
-# cuPy kernels
+# cuPythia kernels
 
 GPU-accelerated, **validated** building blocks toward CUDA Pythia. Every kernel
 is checked against an analytic or CPU reference and benchmarked on an RTX 5050

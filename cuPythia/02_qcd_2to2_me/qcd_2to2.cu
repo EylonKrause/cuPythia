@@ -1,4 +1,4 @@
-// cuPy kernel 02 — batched QCD 2->2 matrix element  g g -> g g.
+// cuPythia kernel 02 — batched QCD 2->2 matrix element  g g -> g g.
 //
 // Verbatim port of Pythia 8.317 Sigma2gg2gg::sigmaKin (src/SigmaQCD.cc:115-129),
 // the study's #1 GPU target: pure branchless double arithmetic on

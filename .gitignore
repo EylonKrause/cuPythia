@@ -15,15 +15,15 @@ pythia8317/examples/hepmcout*
 # Source tarball (re-downloadable from pythia.org)
 *.tgz
 
-# cuPy GPU build outputs
+# cuPythia GPU build outputs
 build/
-cupy/**/*.out
-cupy/**/bench_*
-cupy/**/mc_pi
-cupy/**/xsec
-cupy/**/qcd_2to2
-cupy/**/fused_gg2gg
-cupy/**/err*.log
+cuPythia/**/*.out
+cuPythia/**/bench_*
+cuPythia/**/mc_pi
+cuPythia/**/xsec
+cuPythia/**/qcd_2to2
+cuPythia/**/fused_gg2gg
+cuPythia/**/err*.log
 
 # Scratch / logs
 *.log

@@ -1,4 +1,4 @@
-// cuPy kernel 03 — FUSED, GPU-RESIDENT phase-space + ME for g g -> g g.
+// cuPythia kernel 03 — FUSED, GPU-RESIDENT phase-space + ME for g g -> g g.
 //
 // The point of the project, demonstrated. Kernel 02 transferred pre-generated
 // (sHat,tHat,uHat) arrays and got only 1.3x end-to-end (PCIe + FP64 bound).

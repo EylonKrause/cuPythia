@@ -4,7 +4,7 @@
 // Host/device-identical SplitMix64 counter-based RNG (no cuRAND dependency).
 // Counter-based so each GPU thread derives an independent stream from (seed,tid)
 // with no per-thread state to store, and CPU/GPU produce bit-identical draws —
-// which is what lets cuPy validate GPU kernels against a CPU reference exactly.
+// which is what lets cuPythia validate GPU kernels against a CPU reference exactly.
 __host__ __device__ inline uint64_t splitmix64(uint64_t x) {
   x += 0x9E3779B97F4A7C15ULL;
   x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ULL;

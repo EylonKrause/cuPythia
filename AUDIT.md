@@ -1,4 +1,4 @@
-# Pythia 8.317 audit — cuPy subsystem study
+# Pythia 8.317 audit — cuPythia subsystem study
 
 Findings from a 6-subsystem, 32-agent study of Pythia 8.317, **each
 adversarially re-verified at file:line** (17 confirmed, 7 rejected, 1 uncertain).

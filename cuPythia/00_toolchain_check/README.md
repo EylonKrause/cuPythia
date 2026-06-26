@@ -1,7 +1,7 @@
 # 00 — Toolchain check (GPU Monte Carlo π)
 
 Proves the CUDA toolchain + GPU work end-to-end, and establishes the
-host/device-identical **SplitMix64** counter-based RNG that later cuPy kernels
+host/device-identical **SplitMix64** counter-based RNG that later cuPythia kernels
 reuse (no cuRAND dependency). π has a known answer, so correctness is
 unambiguous.
 

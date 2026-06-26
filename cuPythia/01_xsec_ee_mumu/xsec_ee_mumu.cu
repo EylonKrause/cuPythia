@@ -1,4 +1,4 @@
-// cuPy kernel 01 — GPU Monte-Carlo integration of sigma(e+ e- -> mu+ mu-).
+// cuPythia kernel 01 — GPU Monte-Carlo integration of sigma(e+ e- -> mu+ mu-).
 //
 // Tree-level QED (s-channel photon, massless muons, no Z):
 //     dsigma/dOmega = alpha^2 / (4 s) * (1 + cos^2 theta)

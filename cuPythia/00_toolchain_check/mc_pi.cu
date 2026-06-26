@@ -1,7 +1,7 @@
-// cuPy toolchain check — GPU Monte Carlo estimate of pi.
+// cuPythia toolchain check — GPU Monte Carlo estimate of pi.
 //
 // Purpose: prove the CUDA toolchain + RTX 5050 work end-to-end, and establish
-// the host/device-identical counter-based RNG that later cuPy kernels reuse.
+// the host/device-identical counter-based RNG that later cuPythia kernels reuse.
 // Known answer (pi) makes correctness unambiguous; throughput is compared
 // fairly as samples/second so GPU and CPU need not run the same sample count.
 //

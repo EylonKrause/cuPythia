@@ -1,4 +1,4 @@
-# cuPy GPU kernels. Override NVCC / ARCH on the command line as needed:
+# cuPythia GPU kernels. Override NVCC / ARCH on the command line as needed:
 #   make ARCH=sm_120            # Blackwell / RTX 5050 (default)
 #   make NVCC=/path/to/nvcc
 NVCC      ?= /usr/local/cuda/bin/nvcc
