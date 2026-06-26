@@ -14,18 +14,7 @@
 #include <cmath>
 #include <chrono>
 #include <cuda_runtime.h>
-
-// SplitMix64: host/device-identical, counter-based (no cuRAND dependency).
-__host__ __device__ inline uint64_t splitmix64(uint64_t x) {
-  x += 0x9E3779B97F4A7C15ULL;
-  x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ULL;
-  x = (x ^ (x >> 27)) * 0x94D049BB133111EBULL;
-  return x ^ (x >> 31);
-}
-// uint64 -> double in [0,1), using the top 53 bits.
-__host__ __device__ inline double u01(uint64_t u) {
-  return (u >> 11) * (1.0 / 9007199254740992.0); // 1 / 2^53
-}
+#include "../common/rng.cuh"
 
 __global__ void mcPiKernel(uint64_t seed, uint64_t samplesPerThread,
                            unsigned long long* globalInside) {
