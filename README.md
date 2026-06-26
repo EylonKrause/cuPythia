@@ -33,10 +33,10 @@ Every speedup here ships with a reproducible benchmark and a correctness check.
 | 00 | Monte-Carlo π | π (known) | ~21× |
 | 01 | σ(e⁺e⁻→μ⁺μ⁻) | 4πα²/3s | ~17.7× |
 | 02 | QCD gg→gg ME (Pythia `Sigma2gg2gg`) | CPU port + textbook | 4.5× kern / 1.3× e2e |
-| 03 | fused resident gg→gg MC | Simpson quadrature | ~6.8× |
+| 03 | fused resident gg→gg MC | Simpson quadrature | **~12×** (reciprocal-opt ME) |
 | 04 | multi-GPU / multi-node MC | exact grid coverage + quadrature | ~N× per GPU |
 | 05 | reproducible per-event RNG | out-of-order regen + node partition | bit-identical |
-| 06 | FP32 / mixed precision | FP64 + Simpson | **30× over FP64**, same accuracy |
+| 06 | FP32 / mixed precision | FP64 + Simpson | FP32 ~10× over (reciprocal-opt) FP64 |
 | 07 | unweighting efficiency + LHE output | η==⟨w⟩/w_max + σ vs Simpson | η=10% (gg→gg) + standard I/O |
 | 08 | QCD 2→2 process library | 5 processes, Pythia vs textbook | all PASS <1e-12 |
 | 09 | neutrino DIS (parton model) | flat vs (1−y)², ratio=3 | EW/ν sector |

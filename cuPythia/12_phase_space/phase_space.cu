@@ -48,8 +48,9 @@ __global__ void psKernel(uint64_t seed, uint64_t nPer, double sqrtS, double m,
     double c = (2.0*u01(splitmix64(ctr++))-1.0)*cMax;        // cos theta
     double phi = 2.0*M_PI*u01(splitmix64(ctr++));
     double st = sqrt(fmax(0.0,1.0-c*c));
-    V4 p3 = {E,  p*st*cos(phi),  p*st*sin(phi),  p*c};
-    V4 p4 = {E, -p*st*cos(phi), -p*st*sin(phi), -p*c};
+    double sph, cph; sincos(phi, &sph, &cph);   // one sincos instead of 2x sin + 2x cos
+    V4 p3 = {E,  p*st*cph,  p*st*sph,  p*c};
+    V4 p4 = {E, -p*st*cph, -p*st*sph, -p*c};
     // conservation: p3+p4 must equal p1+p2 = (sqrtS,0,0,0)
     double dE=(p3.e+p4.e)-(p1.e+p2.e), dx=p3.x+p4.x, dy=p3.y+p4.y, dz=p3.z+p4.z;
     double cons = fmax(fabs(dE), fmax(fabs(dx), fmax(fabs(dy), fabs(dz))));
