@@ -25,11 +25,12 @@ __host__ __device__ inline double dot4(const V4& a, const V4& b) {
 }
 __host__ __device__ inline double pow2(double x){ return x*x; }
 __host__ __device__ inline double gg2gg_sigma(double s,double t,double u,double aS){
-  double s2=s*s,t2=t*t,u2=u*u;
-  double a=(9./4.)*(t2/s2+2.*t/s+3.+2.*s/t+s2/t2);
-  double b=(9./4.)*(u2/s2+2.*u/s+3.+2.*s/u+s2/u2);
-  double c=(9./4.)*(t2/u2+2.*t/u+3.+2.*u/t+u2/t2);
-  return (M_PI/s2)*pow2(aS)*0.5*(a+b+c);
+  double is=1.0/s,it=1.0/t,iu=1.0/u; // reciprocal precompute: 3 FP64 div instead of 13
+  double rts=t*is,rst=s*it,rus=u*is,rsu=s*iu,rtu=t*iu,rut=u*it;
+  double a=(9./4.)*(rts*rts+2.*rts+3.+2.*rst+rst*rst);
+  double b=(9./4.)*(rus*rus+2.*rus+3.+2.*rsu+rsu*rsu);
+  double c=(9./4.)*(rtu*rtu+2.*rtu+3.+2.*rut+rut*rut);
+  return (M_PI*is*is)*pow2(aS)*0.5*(a+b+c);
 }
 
 // Generate 2->2 four-momenta in the CM frame; reduce conservation / mass residuals

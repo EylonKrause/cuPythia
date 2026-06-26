@@ -25,11 +25,12 @@
 
 __host__ __device__ inline double pow2(double x) { return x * x; }
 __host__ __device__ inline double gg2gg_sigma(double sH, double tH, double uH, double alpS) {
-  double sH2 = sH * sH, tH2 = tH * tH, uH2 = uH * uH;
-  double a = (9. / 4.) * (tH2 / sH2 + 2. * tH / sH + 3. + 2. * sH / tH + sH2 / tH2);
-  double b = (9. / 4.) * (uH2 / sH2 + 2. * uH / sH + 3. + 2. * sH / uH + sH2 / uH2);
-  double c = (9. / 4.) * (tH2 / uH2 + 2. * tH / uH + 3. + 2. * uH / tH + uH2 / tH2);
-  return (M_PI / sH2) * pow2(alpS) * 0.5 * (a + b + c);
+  double is=1.0/sH, it=1.0/tH, iu=1.0/uH;  // reciprocal precompute: 3 FP64 div instead of 13
+  double rts=tH*is, rst=sH*it, rus=uH*is, rsu=sH*iu, rtu=tH*iu, rut=uH*it;
+  double a = (9. / 4.) * (rts*rts + 2.*rts + 3. + 2.*rst + rst*rst);
+  double b = (9. / 4.) * (rus*rus + 2.*rus + 3. + 2.*rsu + rsu*rsu);
+  double c = (9. / 4.) * (rtu*rtu + 2.*rtu + 3. + 2.*rut + rut*rut);
+  return (M_PI * is*is) * pow2(alpS) * 0.5 * (a + b + c);
 }
 __host__ __device__ inline double weightAt(double cosT, double s, double alpS) {
   double t = -0.5 * s * (1.0 - cosT);

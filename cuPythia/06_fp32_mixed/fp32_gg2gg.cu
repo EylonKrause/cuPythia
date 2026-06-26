@@ -20,11 +20,12 @@
 
 template <typename T>
 __host__ __device__ inline T gg2gg_sigmaT(T sH, T tH, T uH, T alpS) {
-  T sH2 = sH * sH, tH2 = tH * tH, uH2 = uH * uH;
-  T a = (T)(9.0 / 4.0) * (tH2 / sH2 + (T)2 * tH / sH + (T)3 + (T)2 * sH / tH + sH2 / tH2);
-  T b = (T)(9.0 / 4.0) * (uH2 / sH2 + (T)2 * uH / sH + (T)3 + (T)2 * sH / uH + sH2 / uH2);
-  T c = (T)(9.0 / 4.0) * (tH2 / uH2 + (T)2 * tH / uH + (T)3 + (T)2 * uH / tH + uH2 / tH2);
-  return ((T)M_PI / sH2) * alpS * alpS * (T)0.5 * (a + b + c);
+  T is=(T)1/sH, it=(T)1/tH, iu=(T)1/uH;  // reciprocal precompute: 3 div instead of 13 (helps FP64 path)
+  T rts=tH*is, rst=sH*it, rus=uH*is, rsu=sH*iu, rtu=tH*iu, rut=uH*it;
+  T a = (T)(9.0 / 4.0) * (rts*rts + (T)2*rts + (T)3 + (T)2*rst + rst*rst);
+  T b = (T)(9.0 / 4.0) * (rus*rus + (T)2*rus + (T)3 + (T)2*rsu + rsu*rsu);
+  T c = (T)(9.0 / 4.0) * (rtu*rtu + (T)2*rtu + (T)3 + (T)2*rut + rut*rut);
+  return ((T)M_PI * is*is) * alpS * alpS * (T)0.5 * (a + b + c);
 }
 
 template <typename T>
