@@ -11,44 +11,40 @@ BINS = 00_toolchain_check/mc_pi 01_xsec_ee_mumu/xsec 02_qcd_2to2_me/qcd_2to2 \
        05_reproducible_events/repro_events 06_fp32_mixed/fp32_gg2gg \
        07_unweighting_lhe/unweight_lhe 08_qcd_process_library/qcd_library \
        09_neutrino_dis/nu_dis 10_cub_compaction/cub_compaction \
-       11_vegas_importance/vegas
+       11_vegas_importance/vegas 12_phase_space/phase_space \
+       13_rescattering/rescatter 14_parton_shower/shower
 
 all: $(BINS)
 
 00_toolchain_check/mc_pi: 00_toolchain_check/mc_pi.cu common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
-
 01_xsec_ee_mumu/xsec: 01_xsec_ee_mumu/xsec_ee_mumu.cu common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
-
 02_qcd_2to2_me/qcd_2to2: 02_qcd_2to2_me/qcd_2to2.cu common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
-
 03_fused_resident_me/fused_gg2gg: 03_fused_resident_me/fused_gg2gg.cu common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
-
 04_multi_gpu/multi_gpu_gg2gg: 04_multi_gpu/multi_gpu_gg2gg.cu common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -Xcompiler -pthread -o $@ $<
-
 05_reproducible_events/repro_events: 05_reproducible_events/repro_events.cu common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
-
 06_fp32_mixed/fp32_gg2gg: 06_fp32_mixed/fp32_gg2gg.cu common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
-
 07_unweighting_lhe/unweight_lhe: 07_unweighting_lhe/unweight_lhe.cu common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
-
 08_qcd_process_library/qcd_library: 08_qcd_process_library/qcd_library.cu common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
-
 09_neutrino_dis/nu_dis: 09_neutrino_dis/nu_dis.cu common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
-
 10_cub_compaction/cub_compaction: 10_cub_compaction/cub_compaction.cu common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
-
 11_vegas_importance/vegas: 11_vegas_importance/vegas.cu common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -o $@ $<
+12_phase_space/phase_space: 12_phase_space/phase_space.cu common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -o $@ $<
+13_rescattering/rescatter: 13_rescattering/rescatter.cu common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -o $@ $<
+14_parton_shower/shower: 14_parton_shower/shower.cu common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
 
 # Build everything and run each kernel's self-validation.
@@ -65,6 +61,9 @@ check: all
 	./09_neutrino_dis/nu_dis 2000
 	./10_cub_compaction/cub_compaction 4000000
 	./11_vegas_importance/vegas 1000
+	./12_phase_space/phase_space 1000
+	./13_rescattering/rescatter 8000
+	./14_parton_shower/shower 2000000
 
 # Multi-node build (needs mpicxx in PATH); not part of `all` / `check`.
 mpi:

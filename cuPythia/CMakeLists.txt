@@ -40,7 +40,10 @@ set(CUPYTHIA_KERNELS
   08_qcd_process_library/qcd_library.cu
   09_neutrino_dis/nu_dis.cu
   10_cub_compaction/cub_compaction.cu
-  11_vegas_importance/vegas.cu)
+  11_vegas_importance/vegas.cu
+  12_phase_space/phase_space.cu
+  13_rescattering/rescatter.cu
+  14_parton_shower/shower.cu)
 
 foreach(src ${CUPYTHIA_KERNELS})
   get_filename_component(name ${src} NAME_WE)

@@ -19,6 +19,9 @@ end-to-end, **not** whole-generator claims.
 | 09 | Neutrino DIS (parton model) | flat vs (1−y)² + σ(νq)/σ(νq̄)=3 | PASS | (EW / ν sector) |
 | 10 | CUB on-GPU event compaction | CUB count == atomic count + σ | PASS | (scalable I/O, CUDA lib) |
 | 11 | VEGAS importance sampling | η 10%→76% + integral vs Simpson | PASS | **7.6× efficiency** |
+| 12 | 2→2 phase-space generation | 4-mom conservation + on-shell + σ | PASS | (event kinematics) |
+| 13 | O(N²) hadronic rescattering | GPU all-pairs == CPU (exact) | PASS | (heavy-ion) |
+| 14 | Batched parton shower (Sudakov) | no-emission == exp(−CL) + mean mult | PASS | (sequential→batched) |
 
 \* throughput vs 1 CPU thread. 00/01 do many trials per thread in registers
 (compute-bound → big speedup); 02 transfers SoA arrays + 1 eval/thread
@@ -50,8 +53,9 @@ make mpi        # optional multi-node build of kernel 04 (needs mpicxx)
 - [x] 09 — neutrino DIS parton-model cross sections (EW sector, (1−y)² signature)
 - [x] 10 — on-GPU event compaction with CUB (scalable unweighted-event I/O)
 - [x] 11 — VEGAS adaptive importance sampling (η 10%→76%)
-- [ ] full 2→2 phase-space generation (final-state kinematics)
-- [ ] O(N²) hadronic rescattering (all-pairs, heavy-ion)
-- [ ] batched-across-events parton shower (the hard one)
+- [x] 12 — 2→2 phase-space generation (full final-state four-momenta)
+- [x] 13 — O(N²) hadronic rescattering (heavy-ion all-pairs)
+- [x] 14 — batched parton shower (Sudakov veto vs analytic)
+- [ ] learned sampler (normalizing flow) past VEGAS; full veto shower w/ recoil+colour
 
 Targets/ordering are refined by the Pythia 8.317 subsystem study (`../AUDIT.md`).

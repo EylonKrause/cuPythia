@@ -42,6 +42,9 @@ Every speedup here ships with a reproducible benchmark and a correctness check.
 | 09 | neutrino DIS (parton model) | flat vs (1−y)², ratio=3 | EW/ν sector |
 | 10 | CUB on-GPU event compaction | CUB count == atomic count | scalable I/O |
 | 11 | VEGAS importance sampling | η 10%→76% + integral | **7.6× efficiency** |
+| 12 | 2→2 phase-space generation | 4-mom conservation + on-shell | event kinematics |
+| 13 | O(N²) hadronic rescattering | GPU all-pairs == CPU exact | heavy-ion |
+| 14 | batched parton shower (Sudakov) | no-emission == exp(−CL) | sequential→batched |
 
 See `cuPythia/README.md`. The 02→03 jump (1.3×→6.8×) is the core lesson (keep data
 GPU-resident); 04 scales MC across a cluster (near-linear — the one place that holds).

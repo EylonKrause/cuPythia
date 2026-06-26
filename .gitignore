@@ -36,6 +36,9 @@ cuPythia/**/qcd_library
 cuPythia/**/nu_dis
 cuPythia/**/cub_compaction
 cuPythia/**/vegas
+cuPythia/**/phase_space
+cuPythia/**/rescatter
+cuPythia/**/shower
 cuPythia/**/*.lhe
 cuPythia/**/err*.log
 
