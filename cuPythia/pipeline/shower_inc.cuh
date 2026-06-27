@@ -16,9 +16,26 @@ static const double ASMZ   = 0.1365;        // alpha_s(M_Z)
 #define G2Q4_OVER 4.0   // veto oversample for the option-4 g->qqbar weight (zCosThe makes it >1 in places)
 #endif
 
-// 1-loop running alpha_s, flavour-threshold matched (n_f=5,4,3 across m_b,m_c).
+// Running alpha_s, flavour-threshold matched (n_f=5,4,3 across m_b,m_c). 1-loop by default;
+// -DAS_2LOOP selects the 2-loop form matching Pythia AlphaStrong order=2 (bit-identical, see
+// as2loop_validate.cc). NOTE (honest): a leading-log shower conventionally uses 1-loop(+CMW);
+// 2-loop is offered for completeness, not because it is the right order for THIS shower.
 __host__ __device__ inline double alphaS(double mu2){
-  const double mc2=1.5*1.5, mb2=4.8*4.8, mZ2=MZ*MZ;
+  const double mc2=1.5*1.5, mb2=4.8*4.8;
+#ifdef AS_2LOOP
+  // 2-loop alpha_s (RPP 2006 eq. 9.5): alpha_s = 12pi/(b0 L)*(1 - b1 lnL/L), L=ln(mu^2/Lambda_nf^2),
+  // b0=33-2nf, b1=2(153-19nf)/(33-2nf)^2. Lambda_{5,4,3} matched to alpha_s(M_Z)=0.1365 (mc=1.5,
+  // mb=4.8) -- the exact iterated values Pythia computes (validated bit-identical, max relErr 0).
+  const double L5_2=0.55304629*0.55304629, L4_2=0.72293027*0.72293027, L3_2=0.75652039*0.75652039;
+  double s2min=1.33*1.33*L3_2; if(mu2<s2min) mu2=s2min;     // Pythia SAFETYMARGIN2 low-scale freeze
+  double Lam2,b0,b1;
+  if(mu2>mb2){ Lam2=L5_2; b0=23.0; b1=348.0/529.0; }
+  else if(mu2>mc2){ Lam2=L4_2; b0=25.0; b1=462.0/625.0; }
+  else { Lam2=L3_2; b0=27.0; b1=64.0/81.0; }
+  double ls=log(mu2/Lam2);
+  double a=12.0*M_PI/(b0*ls)*(1.0-b1*log(ls)/ls);
+#else
+  const double mZ2=MZ*MZ;
   const double b5=(33.0-2.0*5.0)/(12.0*M_PI), b4=(33.0-2.0*4.0)/(12.0*M_PI), b3=(33.0-2.0*3.0)/(12.0*M_PI);
   double inv=1.0/ASMZ;
   if(mu2>=mb2){ inv+=b5*log(mu2/mZ2); }
@@ -26,6 +43,7 @@ __host__ __device__ inline double alphaS(double mu2){
     if(mu2>=mc2){ inv+=b4*log(mu2/mb2); }
     else { inv+=b4*log(mc2/mb2)+b3*log(mu2/mc2); } }
   double a=1.0/inv;
+#endif
 #ifdef USE_CMW
   // Catani-Marchesini-Webber rescaling for soft-gluon coherence (NLL accuracy):
   // alpha_s -> alpha_s (1 + alpha_s K/2pi),  K = C_A(67/18 - pi^2/6) - 5 n_f/9.

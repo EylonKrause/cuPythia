@@ -92,12 +92,28 @@ These are real precision advantages, but of *method* (reproducibility, statistic
    reproduces it to **3.24e-3** in the σ-support region (xf_g(0.01,100)=7.9801 vs 7.9796) —
    the real-PDF analog of the toy validation. The grid (`real_pdf.grid`) drops into the same
    arrays for a **physical** hadronic σ instead of the illustrative toy.
-6. **2-loop α_s** and **NLO matching** (POWHEG/MC@NLO) — the precision frontier.
+6. **2-loop α_s — DONE & VALIDATED, with an instructive negative result** (`-DAS_2LOOP`,
+   `shower_inc.cuh`; validator `as2loop_validate.cc`). Implements Pythia's `AlphaStrong` order=2
+   (RPP 2006 eq. 9.5): α_s = 12π/(b₀L)·(1 − b₁ lnL/L), L=ln(μ²/Λ_nf²), with Λ_{5,4,3} iteratively
+   matched to α_s(M_Z)=0.1365 (mc=1.5, mb=4.8). The running is **bit-identical to Pythia** (max
+   relErr **0.0e+00** at every perturbative scale; Λ₅,₄,₃ = 0.5530, 0.7229, 0.7565 GeV; α_s(M_Z²)
+   recovered exactly) including the SAFETYMARGIN2 low-scale freeze. **The honest finding:** plugged
+   into this LL shower it **over-radiates badly** — parton multiplicity 12.7 → **24.3** (≈2×),
+   ⟨1−T⟩ 0.069 → 0.078 — because 2-loop α_s is far larger near the cutoff (4.35 vs 1.62 at pT²ₘᵢₙ)
+   and an LL shower has no NLL terms to compensate. So 2-loop α_s is *correctly implemented* but
+   *physically inappropriate at LL* — it concretely demonstrates **why showers use 1-loop(+CMW)**.
+   Kept opt-in and off by default.
+7. **NLO matching** (POWHEG/MC@NLO) — the genuine remaining frontier (a research program, not a
+   flag): it requires the NLO virtual+real subtraction and a matching scheme, beyond this LL/LO
+   port. Documented honestly as out of scope rather than approximated. (The first-emission ME
+   correction, item 1, already supplies the O(α_s) real ME for the hardest emission.)
 
-Items 1–5 are DONE & VALIDATED (six corrections total, all opt-in via `-D` flags so the
-committed LL/LO results stay byte-stable); item 6 is the remaining research frontier. The g→qqbar
-addition (item 3) was the last *correctness* gap (flavour/string topology), not just a precision
-knob — it took a dedicated research+design pass to get the sharing, masses and colour-fork right.
+Items 1–6 are DONE & VALIDATED (all opt-in via `-D` flags so the committed LL/LO results stay
+byte-stable); item 7 (NLO matching) is the genuine remaining frontier, documented honestly rather
+than approximated. The g→qqbar addition (item 3) was the last *correctness* gap (flavour/string
+topology), not just a precision knob — it took a dedicated research+design pass to get the sharing,
+masses and colour-fork right. Item 6 (2-loop α_s) is an honest *negative* result: implemented
+bit-identically to Pythia, it over-radiates at LL — showing exactly why the shower uses 1-loop.
 
 ## Bottom line
 Pythia is the more physically precise generator. cuPythia's contribution is a

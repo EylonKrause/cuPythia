@@ -42,6 +42,10 @@ shower_fsr_gsplit: shower_fsr.cu shower_inc.cuh ../common/rng.cuh
 # the default rate 0.5233 (+1.9%) instead of the plain-kernel 0.5656; massless kinematics (rate match).
 shower_fsr_g2q4: shower_fsr.cu shower_inc.cuh ../common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -DGLUON_SPLIT -DG2QQ_WEIGHT4 -o $@ $<
+# 2-loop alpha_s (Pythia AlphaStrong order=2, bit-identical). NB it ~doubles the LL parton
+# multiplicity (over-radiates) -- a leading-log shower wants 1-loop; offered for completeness.
+shower_fsr_2loop: shower_fsr.cu shower_inc.cuh ../common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -DAS_2LOOP -o $@ $<
 
 bridge: bridge.cu shower_inc.cuh ../common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
@@ -93,6 +97,11 @@ check: all
 PY8 ?= ../../pythia8317
 genpdf: genpdf.cc
 	g++ -O2 $< -o $@ $$($(PY8)/bin/pythia8-config --cxxflags --libs)
+
+# Optional: validate the 2-loop alpha_s (the -DAS_2LOOP path) bit-identically against Pythia's
+# own AlphaStrong order=2, and print the Lambda_{3,4,5} constants (needs Pythia + PYTHIA8DATA).
+as2loop_validate: as2loop_validate.cc
+	g++ -O2 -std=c++17 $< -o $@ $$($(PY8)/bin/pythia8-config --cxxflags --libs)
 
 # Optional HepMC3 output — needs HepMC3 installed in $(HEPMC3) (built from source to
 # ~/.local; not in `make check` since it is a non-standard dependency). Validates by readback.

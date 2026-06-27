@@ -49,6 +49,8 @@ cuPythia/pipeline/shower_fsr_cmw
 cuPythia/pipeline/shower_fsr_me
 cuPythia/pipeline/shower_fsr_gsplit
 cuPythia/pipeline/shower_fsr_g2q4
+cuPythia/pipeline/shower_fsr_2loop
+cuPythia/pipeline/as2loop_validate
 cuPythia/pipeline/thrust_pythia
 cuPythia/pipeline/multiplicity_pythia
 cuPythia/pipeline/zlund_test
