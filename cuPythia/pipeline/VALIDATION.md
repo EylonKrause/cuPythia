@@ -21,6 +21,7 @@ and an *identical CPU port* consume the same draws — enabling exact GPU-vs-CPU
 | 3 FSR shower | `shower_fsr.cu` | momentum cons.; on-shell; GPU re-run reproducibility; GPU-vs-CPU control flow; **thrust vs Pythia** | see below |
 | 4 hadronization | `hadronize.cu` | momentum cons.; on-shell; GPU≡CPU; reproducible; **multiplicity vs Pythia** | see below |
 | 5 LHE I/O | `lhe_writer.cu` | spec-valid LHEF read back by Pythia (frameType=4) | **10⁴/10⁴** read+showered, imbalance **2.3e-5** |
+| 5 HepMC3 I/O | `hepmc3_writer.cc` | spec-valid HepMC3 Asciiv3, read back by HepMC3's reader | **5000/5000**, round-trip **2.9e-7** |
 | bridge | `bridge.cu`+`bridge_pythia.cc` | GPU shower kinked chains hadronized by Pythia | **5000/5000**, ⟨n_ch⟩ **20.75 ≈ LEP 21** |
 | 4b multi-region hadronization | `hadronize_mr.cu` | all-GPU gluon-kinked Lund: conservation, on-shell, mult vs Pythia | cons **5e-11**, mult **21.0 vs 22.57** (~7%), **3.4% drop** |
 | (unit) Lund f(z) | `zlund_test.cu` | sampled z vs analytic f(z), 3 regimes | χ²/ndf **0.98/1.05/0.92/0.91** |

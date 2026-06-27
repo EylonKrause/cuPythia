@@ -56,8 +56,10 @@ counter-based, so any single event is **O(1)-reproducible** on any node.
 - [x] **stage 5 — standard I/O** (`lhe_writer.cu` + `lhe_validate.cc`): writes GPU-generated
   gg→gg hard events to a **spec-valid LHEF 3.0** file with a valid colour flow, **validated by
   reading it straight back into Pythia** (`Beams:frameType=4`): all 10⁴ events parsed, showered
-  and hadronized, 0 aborts, total-momentum imbalance 2.3e-5. (HepMC3 output + a Rivet smoke
-  test need those libraries, absent in this env — LHE is the implemented, validated interface.)
+  and hadronized, 0 aborts, total-momentum imbalance 2.3e-5. **HepMC3 output**
+  (`hepmc3_writer.cc`, optional `make hepmc3_writer`): writes GPU events as spec-valid HepMC3
+  Asciiv3, validated by reading back with HepMC3's own reader (5000/5000, round-trip 2.9e-7).
+  (Rivet smoke test still needs Rivet + YODA/fastjet, not built here.)
 - [x] **bridge — `bridge.cu` + `bridge_pythia.cc`**: closes the chain end-to-end. The GPU FSR
   shower's colour-ordered **gluon-kinked** parton chain is emitted with a valid open-singlet
   colour flow and hadronized (Pythia kinked-string `forceHadronLevel`). All 5000 GPU-shower

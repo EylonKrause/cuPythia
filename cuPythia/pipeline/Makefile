@@ -59,7 +59,13 @@ check: all
 	./region_test
 	./hadronize_mr 20000
 
+# Optional HepMC3 output — needs HepMC3 installed in $(HEPMC3) (built from source to
+# ~/.local; not in `make check` since it is a non-standard dependency). Validates by readback.
+HEPMC3 ?= $(HOME)/.local
+hepmc3_writer: hepmc3_writer.cc
+	g++ -O2 $< -o $@ -I$(HEPMC3)/include -L$(HEPMC3)/lib -lHepMC3 -Wl,-rpath,$(HEPMC3)/lib
+
 clean:
-	rm -f $(STAGES)
+	rm -f $(STAGES) hepmc3_writer
 
 .PHONY: all check clean
