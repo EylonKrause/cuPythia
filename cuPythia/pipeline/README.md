@@ -70,10 +70,12 @@ counter-based, so any single event is **O(1)-reproducible** on any node.
   entirely on the GPU by porting Pythia's `kinematicsHadron` (the (m²,Γ) coupled quadratic +
   bidirectional region-crossing), `finalRegion` and multi-region `finalTwo` onto the validated
   region table (store only the n−1 low regions; cross regions on demand). Validated on the
-  shower chains: **EXACT 4-momentum conservation 4.9e-11, on-shellness 2.5e-9, reproducible**,
-  multiplicity **20.91 vs Pythia 22.57** (no decays, ~7%). Documented limitation: **~6% of hard
-  configs refragment-fail and are dropped** (biases the mean a few % low); pole masses, no
-  decays/baryons. To our knowledge the first algorithmic (non-ML) GPU multi-region Lund port.
+  shower chains: **EXACT 4-momentum conservation 5e-11, on-shellness 2e-10, reproducible**,
+  multiplicity **21.0 vs Pythia 22.57** (no decays, ~7%). Per-hadron flavour+z retry and a
+  finalTwo flavour-fit retry (Pythia's fallback order) cut the **refragment-drop from 5.8% to
+  3.4%**; the residual is geometry-hard region-crossing solves (dropped, not wrong — biases the
+  mean a few % low). Pole masses, no decays/baryons. To our knowledge the first algorithmic
+  (non-ML) GPU multi-region Lund port.
 
 Design grounded in a web-research pass on GPU-generator architecture
 (Pepper, madgraph4gpu, GPU showers, device PDFs) → see `../../ARCHITECTURE.md`.

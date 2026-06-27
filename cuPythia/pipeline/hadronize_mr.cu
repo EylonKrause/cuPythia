@@ -105,7 +105,7 @@ __host__ __device__ inline bool kinHad(SysLite& S,bool fromPos,const End& e,
   int iPosNew=e.iPos, iNegNew=e.iNeg;
   double pxNew=pxNewIn, pyNew=pyNewIn;
   double pSoFar[4]={0,0,0,0}, pTNew[4]={0,0,0,0}, tmp[4];
-  for(int iStep=0; iStep<2*iMax+4; ++iStep){
+  for(int iStep=0; iStep<4*iMax+8; ++iStep){    // generous bound for multi-region crossings
     Region region; getRegion(S,iPosNew,iNegNew,region);
     double xPosHad,xNegHad,xDirHad,xInvHad;
     if(iStep==0 && e.iPos+e.iNeg==iMax){
@@ -212,7 +212,7 @@ __host__ __device__ inline int tryFragmentMR(const double* P,const int* id,int n
   int nH=0;
   for(int step=0; step<MAXPART-2; ++step){
     bool fromPos=(u01(splitmix64(ctr++))<0.5);
-    End& e = fromPos?pos:neg; End& o = fromPos?neg:pos;
+    End& e = fromPos?pos:neg;
     int pdg=0,fNew=0; double mHad=0,pxHad=0,pyHad=0,pxNew=0,pyNew=0,gx,gy;
     for(int tr=0; tr<20 && pdg==0; ++tr){
       fNew=pickFlavMR(ctr);
@@ -229,12 +229,22 @@ __host__ __device__ inline int tryFragmentMR(const double* P,const int* id,int n
     // Retry the z draw a few times if the region-crossing solve fails or gives a bad hadron
     // (Pythia retries the hadron before refragmenting the whole string). Only on-shell, finite
     // hadrons are accepted -> conservation stays exact (finalTwo distributes the remainder).
+    // Retry the hadron (fresh flavour+pT+z) before giving up — Pythia's fallback order is to
+    // retry the hadron, refragmenting the whole string only as a last resort.
     int iPN,iNN; double xPN,xNN,GN,had[4]; bool made=false;
-    for(int zt=0; zt<10 && !made; ++zt){
-      double z=zLundSample(H_ALUND,H_BLUND*mT2Had,1.0,ctr);
-      if(kinHad(S,fromPos,e,z,mT2Had,mHad,pxHad,pyHad,pxNew,pyNew,iPN,iNN,xPN,xNN,GN,had)){
+    for(int ht=0; ht<24 && !made; ++ht){
+      int rpdg=0,rfNew=0; double rmHad=mHad,rpxHad=pxHad,rpyHad=pyHad,rpxNew=pxNew,rpyNew=pyNew,rmT2=mT2Had,rgx,rgy;
+      if(ht>0){ // redraw flavour+pT for retries (ht==0 reuses the already-drawn hadron)
+        for(int tr=0; tr<20 && rpdg==0; ++tr){ rfNew=pickFlavMR(ctr);
+          rpdg=combineMesonMR(e.flav, fromPos?-rfNew:rfNew, ctr); pairPTMR(ctr,rgx,rgy);
+          if(rpdg!=0){ rmHad=mesonMassMR(rpdg); rpxNew=rgx; rpyNew=rgy; rpxHad=e.px+rpxNew; rpyHad=e.py+rpyNew; } }
+        if(rpdg==0) continue; rmT2=rmHad*rmHad+rpxHad*rpxHad+rpyHad*rpyHad; pdg=rpdg; fNew=rfNew;
+        mHad=rmHad; pxNew=rpxNew; pyNew=rpyNew;
+      }
+      double z=zLundSample(H_ALUND,H_BLUND*rmT2,1.0,ctr);
+      if(kinHad(S,fromPos,e,z,rmT2,rmHad,rpxHad,rpyHad,rpxNew,rpyNew,iPN,iNN,xPN,xNN,GN,had)){
         double hm2=had[3]*had[3]-had[0]*had[0]-had[1]*had[1]-had[2]*had[2];
-        if(had[3]==had[3] && fabs(had[3])<1e6 && fabs(hm2-mHad*mHad)<1e-5*(1.0+mHad*mHad)) made=true;
+        if(had[3]==had[3] && fabs(had[3])<1e6 && fabs(hm2-rmHad*rmHad)<1e-5*(1.0+rmHad*rmHad)) made=true;
       }
     }
     if(!made) return -1;
@@ -242,29 +252,30 @@ __host__ __device__ inline int tryFragmentMR(const double* P,const int* id,int n
     for(int k=0;k<4;++k){ H[4*nH+k]=had[k]; pRem[k]-=had[k]; } hid[nH]=pdg; nH++;
     e.iPos=iPN; e.iNeg=iNN; e.xPos=xPN; e.xNeg=xNN; e.Gamma=GN; e.px=-pxNew; e.py=-pyNew; e.flav=fromPos?fNew:-fNew;
   }
-  // finalTwo (port of :1640-1716)
+  // finalTwo (port of :1640-1716). pT and wT2 are independent of the final flavour, so fix
+  // them first, then retry the flavour pair until the two hadrons fit the remaining mass
+  // (a lighter pair -> pions fits where a heavy one would not).
   Region reg; if(!finalRegion(S,pos,neg,reg)) return -1;
-  int fNew=0,pdg1=0,pdg2=0; double m1=0,m2=0;
-  for(int tr=0; tr<20 && (pdg1==0||pdg2==0); ++tr){
-    fNew=pickFlavMR(ctr);
-    pdg1=combineMesonMR(pos.flav,-fNew,ctr);
-    pdg2=combineMesonMR(fNew,neg.flav,ctr);
-    if(pdg1!=0&&pdg2!=0){ m1=mesonMassMR(pdg1); m2=mesonMassMR(pdg2); }
-  }
-  if(pdg1==0||pdg2==0) return -1;
   double xPp,xPn,prpx,prpy; regionProject(reg,pRem,xPp,xPn,prpx,prpy);
   double pxRem=prpx-pos.px-neg.px, pyRem=prpy-pos.py-neg.py;
-  double posPx=pos.px+0.5*pxRem, posPy=pos.py+0.5*pyRem, negPx=neg.px+0.5*pxRem, negPy=neg.py+0.5*pyRem;
-  double pos_pxHad=posPx+0.0, pos_pyHad=posPy;        // pos.pxNew folded into the new pair below
-  // For the final two, the "new" pair is shared: posEnd gets +pair? Pythia sets pxNew across ends
-  // (negEnd.pxNew=-posEnd.pxNew). We draw one pair already used above (fNew); set hadron pT = end pT.
-  double m1T2=m1*m1+pos_pxHad*pos_pxHad+pos_pyHad*pos_pyHad;
-  double negpxHad=negPx, negpyHad=negPy;
-  double m2T2=m2*m2+negpxHad*negpxHad+negpyHad*negpyHad;
+  double pos_pxHad=pos.px+0.5*pxRem, pos_pyHad=pos.py+0.5*pyRem;
+  double negpxHad =neg.px+0.5*pxRem, negpyHad =neg.py+0.5*pyRem;
   double wT2=(pRem[3]*pRem[3]-pRem[0]*pRem[0]-pRem[1]*pRem[1]-pRem[2]*pRem[2])
              +(pos_pxHad+negpxHad)*(pos_pxHad+negpxHad)+(pos_pyHad+negpyHad)*(pos_pyHad+negpyHad);
-  if(sqrt(wT2)<sqrt(m1T2)+sqrt(m2T2)) return -1;
-  double lam2=(wT2-m1T2-m2T2)*(wT2-m1T2-m2T2)-4.0*m1T2*m2T2; if(lam2<=0) return -1;
+  int fNew=0,pdg1=0,pdg2=0; double m1=0,m2=0,m1T2=0,m2T2=0,lam2=-1.0;
+  for(int ft=0; ft<40 && lam2<=0.0; ++ft){
+    int p1=0,p2=0;
+    for(int tr=0; tr<20 && (p1==0||p2==0); ++tr){ fNew=pickFlavMR(ctr);
+      p1=combineMesonMR(pos.flav,-fNew,ctr); p2=combineMesonMR(fNew,neg.flav,ctr); }
+    if(p1==0||p2==0) continue;
+    double mm1=mesonMassMR(p1), mm2=mesonMassMR(p2);
+    double t1=mm1*mm1+pos_pxHad*pos_pxHad+pos_pyHad*pos_pyHad;
+    double t2=mm2*mm2+negpxHad*negpxHad+negpyHad*negpyHad;
+    if(sqrt(wT2)<sqrt(t1)+sqrt(t2)) continue;
+    double l2=(wT2-t1-t2)*(wT2-t1-t2)-4.0*t1*t2;
+    if(l2>0.0){ pdg1=p1;pdg2=p2;m1=mm1;m2=mm2;m1T2=t1;m2T2=t2;lam2=l2; }
+  }
+  if(lam2<=0.0) return -1;
   double lam=sqrt(lam2), pRev=1.0/(1.0+exp(fmin(50.0,H_BLUND*lam)));
   double xpz=0.5*lam/wT2; if(pRev>u01(splitmix64(ctr++))) xpz=-xpz;
   double xmd=(m1T2-m2T2)/wT2, xeP=0.5*(1.0+xmd), xeN=0.5*(1.0-xmd);
@@ -280,7 +291,7 @@ __host__ __device__ inline int tryFragmentMR(const double* P,const int* id,int n
   return nH;
 }
 __host__ __device__ inline int hadronizeMR(const double* P,const int* id,int n,uint64_t ctr,double* H,int* hid){
-  for(int retry=0; retry<25; ++retry){ int r=tryFragmentMR(P,id,n,ctr,H,hid); if(r>0) return r; }
+  for(int retry=0; retry<50; ++retry){ int r=tryFragmentMR(P,id,n,ctr,H,hid); if(r>0) return r; }
   return -1;
 }
 
