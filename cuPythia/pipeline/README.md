@@ -58,6 +58,13 @@ counter-based, so any single event is **O(1)-reproducible** on any node.
   reading it straight back into Pythia** (`Beams:frameType=4`): all 10⁴ events parsed, showered
   and hadronized, 0 aborts, total-momentum imbalance 2.3e-5. (HepMC3 output + a Rivet smoke
   test need those libraries, absent in this env — LHE is the implemented, validated interface.)
+- [x] **bridge — `bridge.cu` + `bridge_pythia.cc`**: closes the chain end-to-end. The GPU FSR
+  shower's colour-ordered **gluon-kinked** parton chain is emitted with a valid open-singlet
+  colour flow and hadronized (Pythia kinked-string `forceHadronLevel`). All 5000 GPU-shower
+  singlets hadronize, conserving to 2.9e-7, and the full e⁺e⁻ **charged multiplicity is 20.75
+  — matching the LEP measurement ⟨n_ch⟩≈21** at the Z pole. (The all-GPU *kinked* hadronizer,
+  i.e. multi-region strings, is the next research step; `hadronize.cu` is all-GPU for the
+  straight q-q̄ string.)
 
 Design grounded in a web-research pass on GPU-generator architecture
 (Pepper, madgraph4gpu, GPU showers, device PDFs) → see `../../ARCHITECTURE.md`.

@@ -68,7 +68,7 @@ int main(int argc,char**argv){
   }
   fprintf(f,"</LesHouchesEvents>\n");
   fclose(f);
-  printf("wrote %d gg->gg events to %s (spec-valid LHEF 3.0, closed colour ring)\n",N,path);
+  printf("wrote %d gg->gg events to %s (spec-valid LHEF 3.0, valid t-channel colour flow)\n",N,path);
   cudaFree(dO);
   return 0;
 }
