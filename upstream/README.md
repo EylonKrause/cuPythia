@@ -25,7 +25,7 @@ bit-identity is a real regression. The patch in this directory is the verified d
 |----|------|--------|
 | OPT2 | `src/SimpleTimeShower.cc:2598`, `SimpleSpaceShower.cc:855` (+headers) | external `pTnext` takes `Event` **by value** inside `noEmissionProbability`'s 10000-trial loop → `Event&`/`const Event&` + `const vector<…DipoleEnd>&` (a deep `Event` copy per trial). SpaceShower can take `const Event&`; TimeShower needs non-const `Event&` (it forwards to non-const `pT2nextQCD`/`finiteCorrection`) — minimal blast radius. |
 | OPT4 | `src/StringFragmentation.cc:744` | `rapPairs = colConfig.rapPairs` deep-copies a `vector<vector<pair<double,double>>>` every `fragment()`, read-only → `const&`. |
-| OPT5 | `src/StringFragmentation.cc:1143,1203,1224,1255,1307…` | `StringRegion X = system.region(...)` copies an 8-`Vec4` struct; `region()` returns a reference, `X` read-only → `const StringRegion&` (per site). |
+| OPT5 | `src/StringFragmentation.cc:1143,1203,1224,1255,1307…` | `StringRegion X = system.region(...)` copies an 8-`Vec4` struct; `region()` returns a reference → `const StringRegion&` per site. **Caveat (found by attempting it): the locals call `StringRegion` methods (`pHad`, `particle`, …) that are not marked `const`, so the MR must first const-ify those accessors (they are read-only) — otherwise `const&` fails to compile. A real, slightly larger MR, not a one-liner.** |
 
 ## Documented (off the default path — needs a targeted regression, not main101)
 
