@@ -39,11 +39,17 @@ bit-identity is a real regression. The patch in this directory is the verified d
 | OPT10 | `src/SigmaLowEnergy.cc:446,634` | `sigmaPartial`/`pickProcess` allocate fresh vectors per call then linear-scan → reuse member buffers / index directly. |
 | OPT11 | `src/PhaseSpace.cc:618,772,930` | the set{1,2,3}Kin+sigmaPDF+weights block is triplicated verbatim → extract one inlined helper (maintainability). |
 
-Full per-finding crafted diffs + PR bodies + targeted regressions were produced by the
-audit (see `../AUDIT.md` for the verified `file:line` and exact fix for each). Each MR
-should be submitted separately with its own targeted before/after comparison; the
-off-path ones (OPT3/6–10) need a config that exercises their path (ClosePacking,
-junctions, low-energy rescattering), not a blanket main101 run.
+Honest status of the package: **OPT1 is the only finding packaged here as a ready-to-apply
+`.patch` (and it is verified, above).** OPT2–OPT11 are *specified* — each has the exact
+`file:line` and the precise read-only/fewer-copies/O(1) fix in `../AUDIT.md` and the tables
+above — but the per-finding diffs are **not yet crafted into files**; each must be authored
+from its spec, then verified before submission. (All OPT2–OPT11 `file:line` anchors were
+re-checked against the current source and still match.) Each MR should be submitted
+separately with its own targeted before/after comparison; the off-path ones (OPT3/6–10)
+need a config that exercises their path (ClosePacking, junctions, low-energy rescattering),
+not a blanket main101 run. Note OPT5 splits into OPT5a (read-only `StringRegion` sites —
+clean `const&`) and OPT5b (sites calling `gluonOffset`/`massiveOffset`, which take `Event&`
+and must be const-ified first — a larger, semantics-touching MR; defer).
 
 ## How to submit
 1. `git apply upstream/OPT1-sigmaPDF-slot-lookup.patch` onto a clean Pythia 8.317 checkout.

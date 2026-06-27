@@ -66,7 +66,9 @@ g2q1` counts status-51 quarks with a gluon mother /2):
 - hadronization of the forked multi-string events (`hadronize_mr -DGLUON_SPLIT`, `findStrings` slices
   the chain at each q̄-then-q boundary): **4-momentum conservation exact (1.43e-10)**, on-shell exact,
   reproducible; mult 20.92 vs 21.01 (−0.4%, a gluon kink → quark string-break), drop 3.0% (< the 3.4%
-  single-string rate, since forks simplify the region geometry).
+  single-string rate, since forks simplify the region geometry). *Future:* a momentum-compensating
+  low-mass collapse-to-one-hadron would recover the dropped (sub-2-hadron) sub-strings; deferred
+  because the drop rate is already low and a cross-string recoil risks the exact-conservation guarantee.
 
 ## Stage 4 — Lund string hadronization, in detail
 
