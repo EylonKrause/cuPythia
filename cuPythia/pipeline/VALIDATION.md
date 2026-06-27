@@ -23,6 +23,7 @@ and an *identical CPU port* consume the same draws — enabling exact GPU-vs-CPU
 | 5 LHE I/O | `lhe_writer.cu` | spec-valid LHEF read back by Pythia (frameType=4) | **10⁴/10⁴** read+showered, imbalance **2.3e-5** |
 | bridge | `bridge.cu`+`bridge_pythia.cc` | GPU shower kinked chains hadronized by Pythia | **5000/5000**, ⟨n_ch⟩ **20.75 ≈ LEP 21** |
 | (unit) Lund f(z) | `zlund_test.cu` | sampled z vs analytic f(z), 3 regimes | χ²/ndf **0.98/1.05/0.92/0.91** |
+| (unit) multi-region table | `region_test.cu` | gluon-kinked region basis: lightlike + orthonormal + project/pHad inverse | **5.7e-16** (q-g-q̄), **8.9e-16** (q-g-g-q̄) |
 | (tool) FFT luminosity | `pdf_lumi_fft.cu` | cuFFT convolution vs direct O(N²) | agree **1.7e-7**, **94×/464×** faster |
 
 ## Stage 3 (the headline) — FSR dipole shower, in detail

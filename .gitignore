@@ -53,6 +53,7 @@ cuPythia/pipeline/lhe_writer
 cuPythia/pipeline/lhe_validate
 cuPythia/pipeline/bridge
 cuPythia/pipeline/bridge_pythia
+cuPythia/pipeline/region_test
 cuPythia/pipeline/shower_partons.dat
 cuPythia/pipeline/pmin
 cuPythia/pipeline/*.dat
