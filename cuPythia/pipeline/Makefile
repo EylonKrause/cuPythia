@@ -4,7 +4,7 @@ NVCC      ?= /usr/local/cuda/bin/nvcc
 ARCH      ?= sm_120
 NVCCFLAGS ?= -O3 -std=c++17 -arch=$(ARCH)
 
-STAGES = build_events reweight generate pdf_xsec pdf_lumi_fft
+STAGES = build_events reweight generate pdf_xsec pdf_lumi_fft shower_fsr
 
 all: $(STAGES)
 
@@ -23,6 +23,9 @@ pdf_xsec: pdf_xsec.cu pdf.cuh physics.cuh ../common/rng.cuh
 pdf_lumi_fft: pdf_lumi_fft.cu
 	$(NVCC) $(NVCCFLAGS) -o $@ $< -lcufft
 
+shower_fsr: shower_fsr.cu ../common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -o $@ $<
+
 # Build + validate every pipeline stage.
 check: all
 	./build_events 500000
@@ -30,6 +33,7 @@ check: all
 	./generate 1000000
 	./pdf_xsec 4000
 	./pdf_lumi_fft 15
+	./shower_fsr 200000
 
 clean:
 	rm -f $(STAGES)

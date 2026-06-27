@@ -25,7 +25,14 @@ counter-based, so any single event is **O(1)-reproducible** on any node.
 - [x] **orchestrator — `generate.cu`**: the device-resident parton-level generator —
   build → reweight → unweight → CUB-compact, **all on one record, no host round-trip**
   (the gap Pepper/madgraph4gpu concede). σ vs quadrature, scale band, CUB count exact.
-- [ ] stage 3 — physical parton shower (recoil + colour + variable P(z)) into the record
+- [x] **stage 3 — `shower_fsr.cu`**: a physical final-state (timelike) **dipole shower**,
+  one event per GPU thread (GAPS pattern), with Pythia `SimpleTimeShower` splitting kernels
+  $(1+z^2)/2$, $(1+z^3)/2$, running-α_s trial generation, z-sampling, and exact local-dipole
+  **recoil kinematics**. Validated on e⁺e⁻→Z→qq̄: 4-momentum conservation **1.8e-9**,
+  on-shellness **1.5e-12**, GPU re-runs bit-identical, and the **control flow is 100%
+  bit-identical to an independent CPU port** (momenta agree to 1.4e-12, GPU/CPU IEEE limit).
+  Scope: FSR-only, massless, q→qg & g→gg (g→qq̄ + flavour thresholds = TODO); Rivet
+  observables vs Pythia are the next validation layer.
 - [ ] stage 4 — hadronization on device (feasibility-gated) + decays
 - [ ] stage 5 — standard I/O (spec-valid LHE / HepMC3 / Rivet smoke test)
 
