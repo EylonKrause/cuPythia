@@ -120,8 +120,17 @@ __host__ __device__ inline bool doKin(const double* R,const double* C,double pT2
 }
 // Shower one event into local arrays P (px,py,pz,E) and id; return nPartons.
 __host__ __device__ __noinline__ int showerEvent(double* P,int* id,uint64_t ctr){  // __noinline__: keep the kernel compilable (don't inline this giant fn); physics identical
-  P[0]=0;P[1]=0;P[2]= EBEAM;P[3]=EBEAM; id[0]= 1;
-  P[4]=0;P[5]=0;P[6]=-EBEAM;P[7]=EBEAM; id[1]=-1;
+  int q0=1;
+#ifdef ZFLAV
+  // Initial qqbar flavour drawn from the Z hadronic branching fractions (PDG):
+  // d 0.2203, u 0.1709, s 0.2203, c 0.1706, b 0.2179 (sum 1). Default build (no ZFLAV): always d.
+  // NOTE: the parton shower here is massless, so b/c get no dead-cone suppression (over-radiates a
+  // little at small angle); the dominant Z-flavour effect on track yield is B/D *decays* (-DHFDECAY).
+  { double rf=u01(splitmix64(ctr++));
+    q0 = (rf<0.2203)?1 : (rf<0.3912)?2 : (rf<0.6115)?3 : (rf<0.7821)?4 : 5; }
+#endif
+  P[0]=0;P[1]=0;P[2]= EBEAM;P[3]=EBEAM; id[0]= q0;
+  P[4]=0;P[5]=0;P[6]=-EBEAM;P[7]=EBEAM; id[1]=-q0;
   int n=2; double pT2=0.25*MZ*MZ;
 #ifdef ME_FIRST
   // Replace the first/hardest emission with the EXACT Z->qqg ME, then shower below its pT
@@ -134,9 +143,9 @@ __host__ __device__ __noinline__ int showerEvent(double* P,int* id,uint64_t ctr)
       double phi=2.0*M_PI*u01(splitmix64(ctr++)), cph=cos(phi),sph=sin(phi);
       double qbx=E2*s12, qbz=E2*c12;               // qbar; q is along +z
       double gx=-qbx, gz=-(E1+qbz);                 // g = -(q+qbar) (q has no x)
-      P[0]=0;P[1]=0;P[2]=E1;P[3]=E1; id[0]=1;                                   // q  (+z)
+      P[0]=0;P[1]=0;P[2]=E1;P[3]=E1; id[0]=q0;                                  // q  (+z)
       P[4]=gx*cph; P[5]=gx*sph; P[6]=gz; P[7]=E3; id[1]=21;                     // g
-      P[8]=qbx*cph; P[9]=qbx*sph; P[10]=qbz; P[11]=E2; id[2]=-1;                // qbar
+      P[8]=qbx*cph; P[9]=qbx*sph; P[10]=qbz; P[11]=E2; id[2]=-q0;               // qbar
       n=3; pT2=pt2;
     }
   }

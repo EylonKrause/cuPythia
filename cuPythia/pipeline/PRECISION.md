@@ -9,8 +9,8 @@ CMW α_s, and is tuned to LEP/LHC data. cuPythia is a from-scratch GPU port with
 
 | aspect | Pythia 8 | cuPythia (this pipeline) |
 |---|---|---|
-| shower | NLL-ish, ME-corrected, g→qqbar, CMW α_s | **leading-log**, q→qg & g→gg (+ g→qqbar `-DGLUON_SPLIT`), 1-loop α_s (threshold-matched) |
-| hadronization | full Lund: BW masses, all multiplets, baryons, decays | pseudoscalar+vector, pole masses (+BW `-DUSE_BW`), uds, **no baryons** (+ hadron decays `-DDECAYS`) |
+| shower | NLL-ish, ME-corrected, g→qqbar, CMW α_s | **leading-log**, q→qg & g→gg (+ g→qqbar `-DGLUON_SPLIT`), 1-loop α_s (threshold-matched), Z-flavour init `-DZFLAV` |
+| hadronization | full Lund: BW masses, all multiplets, baryons, decays | pseudoscalar+vector, pole masses (+BW `-DUSE_BW`), uds (+ baryons `-DBARYONS`), light + D/B decays (`-DDECAYS`/`-DHFDECAY`, Dalitz ME `-DDALITZ_ME`) |
 | hard process | NLO/merged, LHAPDF | LO gg→gg, toy PDF (real LHAPDF drops in) |
 | tuning | decades of data tunes | untuned (Pythia defaults) |
 
@@ -138,17 +138,59 @@ These are real precision advantages, but of *method* (reproducibility, statistic
    `finalRegion`, `decayEvent`, `regionSetUp`, …) **`__noinline__`** splits it into tractable pieces
    with **bit-identical physics** (make check 12/12, byte-identical). The full chain then compiles
    (~10 min at -O2). The default -O3 build (flags off) is unaffected and byte-identical.
-9. **NLO matching** (POWHEG/MC@NLO) — the genuine remaining frontier (a research program, not a
+9. **Z-flavour initialisation — DONE & VALIDATED** (`-DZFLAV`, `shower_inc.cuh`). The committed shower
+   always starts the string as d-d̄; this draws the initial qq̄ from the **Z hadronic branching
+   fractions** (PDG: d 0.2203, u 0.1709, s 0.2203, c 0.1706, b 0.2179) so the event flavour mix — and
+   hence the heavy-hadron (D/B) content — is realistic. Required adding the **open charm/bottom meson
+   masses** (D, D*, Ds, Ds*, B, B*, Bs…) to `mesonMassMR`, since b/c are now *primary* endpoints (not
+   the rare g→qqbar tail). **Validated** (20k, +g→qqbar): per-event electric charge conserved **0
+   non-conserving / 18278**, no unknown species, **D ≈ 0.39/event, B ≈ 0.37/event** (≈ Z→cc̄/bb̄ × two
+   endpoints, correct isospin D⁰≈D⁺, B⁰≈B⁺), conservation exact (2.1e-9). **Honest note:** the parton
+   shower is massless, so b/c get no dead-cone suppression (slightly over-radiate at small angle); and
+   ZFLAV *alone* (heavy hadrons left stable) *lowers* charged mult (10.2 vs 11.3) because heavier
+   endpoints fragment into fewer pieces — the track yield comes from **decaying** those D/B (item 10).
+   (A review pass also corrected `combineMesonMR` to use Pythia's **per-flavour** vector/pseudoscalar
+   suppression for the new c/b endpoints — `mesonCvector`=0.88, `mesonBvector`=2.20 — instead of reusing
+   the strange value 0.55, fixing the D*/D and B*/B production ratios; default uds path untouched →
+   byte-identical.)
+10. **Heavy-flavour (D/B) decays — DONE & VALIDATED** (`-DHFDECAY`, `decay_inc.cuh`; in `make checkhf`).
+    A separate D/B decay table (so `-DDECAYS`-only stays byte-identical): D*/Ds* radiative+π (2-body);
+    D⁰/D⁺/Ds weak as a **truncated + renormalized Cabibbo-favoured** 2-/3-/4-body set (PDG BRs); and an
+    **explicitly-labelled effective** B⁰/B⁺/Bs → D(*) + nπ model. Needed a fixed-budget **`fourBody`
+    sampler** (sequential/iterated 2-body phase space — 4-momentum-exact, not flat-4-body; adequate for
+    track counting). **Validated:** `decay_test` (D/B in the parent pool) 4-momentum closure **1.78e-14**,
+    on-shell 1.4e-14, GPU≡CPU 100%, drop 0.7%; in the full ZFLAV chain charged mult **10.2 → 18.95**,
+    per-event charge conserved **0 / 18185**, **every D/B cascades away** (finals are only π/K/γ/K_S/K_L).
+    **Honest caveat:** the effective B is capped at 4-body (no 5-body W*→4π / no D**), so it reaches
+    ⟨n_ch⟩_B ≈ 4.1 vs PDG 4.97 — a documented ~15% undershoot; the D weak set is truncated to the
+    dominant channels and renormalized (⟨n_ch⟩_D ≈ 2.6).
+11. **Dalitz matrix-element shapes — DONE & VALIDATED** (`-DDALITZ_ME`, `decay_inc.cuh`; validator
+    `dalitz_test.cu` in `make checkhf`). Replaces flat 3-body phase space for two channels with the real
+    Dalitz density via **accept-reject** (rigorous clamped envelopes, fixed draw budget, flat fallback):
+    ω/φ→π⁺π⁻π⁰ the **P-wave |p₊×p₋|²** (vanishes at the Dalitz boundary), η→π⁺π⁻π⁰ the **linear+quadratic
+    slope** 1+a·y+b·y²+d·x² (PDG a=−1.095…). **Validated** (2M each, flat control vs ME): ω edge fraction
+    (w<0.02) **0.133 → 0.017** (7.7× edge-suppressed) and ⟨|p₊×p₋|²/wmax⟩ 0.077 → **0.104** (= the exact
+    full-P-wave value), η ⟨y⟩ **+0.007 → −0.227** (the famous negative slope); cross-checks confirm the
+    shapes don't bleed (ω's ⟨y⟩ and η's P-wave variable stay put), conservation still exact. Shape-only —
+    it does not change multiplicity or the ALEPH event-shape fit. (An adversarial code-review pass caught
+    that the first ω envelope (p₁max·p₂max)² over-counted ~6× — p₁,p₂ can't both be maximal at once — so
+    ~20% of ω/φ decays were silently falling back to flat, diluting the shape to ~80%; the envelope was
+    tightened by the numerically-verified global max ratio 0.16, dropping the fallback to <0.01% and
+    restoring full strength. Rigorous: 0.20 > 0.16 so the clamp never fires → still unbiased.)
+12. **NLO matching** (POWHEG/MC@NLO) — the genuine remaining frontier (a research program, not a
    flag): it requires the NLO virtual+real subtraction and a matching scheme, beyond this LL/LO
    port. Documented honestly as out of scope rather than approximated. (The first-emission ME
    correction, item 1, already supplies the O(α_s) real ME for the hardest emission.)
 
-Items 1–8 are DONE & VALIDATED (all opt-in via `-D` flags so the committed LL/LO results stay
-byte-stable); item 9 (NLO matching) is the genuine remaining frontier, documented honestly rather
+Items 1–11 are DONE & VALIDATED (all opt-in via `-D` flags so the committed LL/LO results stay
+byte-stable); item 12 (NLO matching) is the genuine remaining frontier, documented honestly rather
 than approximated. The g→qqbar addition (item 3) was the last *correctness* gap (flavour/string
 topology), not just a precision knob — it took a dedicated research+design pass to get the sharing,
 masses and colour-fork right. Item 6 (2-loop α_s) is an honest *negative* result: implemented
 bit-identically to Pythia, it over-radiates at LL — showing exactly why the shower uses 1-loop.
+Items 9–11 (Z-flavour + D/B decays + Dalitz shapes) together make the heavy-flavour sector realistic:
+with ZFLAV+HFDECAY the Z→bb̄/cc̄ track boost is restored (charged mult back to ~18.9 with realistic
+flavour), the last gap to ALEPH 20.73 being a Lund tune (out of scope, not faked).
 
 ## Bottom line
 Pythia is the more physically precise generator. cuPythia's contribution is a

@@ -17,9 +17,21 @@
 #include "decay_inc.cuh"
 
 // Pool of primary ids (unstable parents + a few stable) to exercise the table.
+// Under -DHFDECAY the pool gains the D/B parents (incl. antiparticles -> ccDec path + the 4-body sampler).
+#ifdef HFDECAY
+#define POOLSZ 31
+#else
+#define POOLSZ 16
+#endif
 __host__ __device__ inline int poolId(int k){
-  const int POOL[16]={113,213,-213,223,333,313,-313,323,-323,221,331,311,-311,211,-211,321};
-  return POOL[k%16];
+#ifdef HFDECAY
+  // all 12 HF parent rows exercised (incl. the tight Ds*+ -> Ds+ pi0 ~8.9 MeV margin + B*0/Bs*0 radiative)
+  const int POOL[POOLSZ]={113,213,-213,223,333,313,-313,323,-323,221,331,311,-311,211,-211,321,
+                          413,-423,421,-421,411,-411,431,-431,511,521,-531,-523,433,513,533};
+#else
+  const int POOL[POOLSZ]={113,213,-213,223,333,313,-313,323,-323,221,331,311,-311,211,-211,321};
+#endif
+  return POOL[k%POOLSZ];
 }
 
 __host__ __device__ inline void runOne(uint64_t base,int e,double* cons,double* dm,int* nFout,double* finSum){
@@ -27,7 +39,7 @@ __host__ __device__ inline void runOne(uint64_t base,int e,double* cons,double* 
   double P[8*4]; int id[8];
   int n=2+(int)(5.0*u01(splitmix64(ctr++)));   // 2..6 primaries
   double ps0=0,ps1=0,ps2=0,ps3=0;
-  for(int i=0;i<n;++i){ int pid=poolId((int)(16.0*u01(splitmix64(ctr++))));
+  for(int i=0;i<n;++i){ int pid=poolId((int)((double)POOLSZ*u01(splitmix64(ctr++))));
     double m=decayMass(pid,ctr);                                  // BW/pole mass (1 draw)
     double px=6.0*(u01(splitmix64(ctr++))-0.5), py=6.0*(u01(splitmix64(ctr++))-0.5), pz=6.0*(u01(splitmix64(ctr++))-0.5);
     double en=sqrt(px*px+py*py+pz*pz+m*m);

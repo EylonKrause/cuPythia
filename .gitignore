@@ -71,6 +71,16 @@ cuPythia/pipeline/hadronize_mr_baryon
 cuPythia/pipeline/hadronize_mr_b
 cuPythia/pipeline/hadronize_mr_full
 cuPythia/pipeline/hadronize_mr_bd
+cuPythia/pipeline/hadronize_mr_max
+cuPythia/pipeline/hadronize_mr_hf
+cuPythia/pipeline/hadronize_mr_zf
+cuPythia/pipeline/hadronize_mr_zfhf
+cuPythia/pipeline/shower_fsr_zflav
+cuPythia/pipeline/dalitz_test
+cuPythia/pipeline/dalitz_test_flat
+cuPythia/pipeline/dalitz_test_me
+cuPythia/pipeline/decay_test_hf
+cuPythia/pipeline/decay_test_all
 cuPythia/pipeline/multiplicity_pythia
 cuPythia/pipeline/hepmc3_writer
 cuPythia/pipeline/*.hepmc3

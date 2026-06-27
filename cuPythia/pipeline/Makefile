@@ -4,7 +4,7 @@ NVCC      ?= /usr/local/cuda/bin/nvcc
 ARCH      ?= sm_120
 NVCCFLAGS ?= -O3 -std=c++17 -arch=$(ARCH)
 
-STAGES = build_events reweight generate pdf_xsec pdf_lumi_fft shower_fsr zlund_test hadronize lhe_writer bridge region_test hadronize_mr decay_test baryon_test
+STAGES = build_events reweight generate pdf_xsec pdf_lumi_fft shower_fsr zlund_test hadronize lhe_writer bridge region_test hadronize_mr decay_test baryon_test dalitz_test
 
 all: $(STAGES)
 
@@ -46,6 +46,11 @@ shower_fsr_g2q4: shower_fsr.cu shower_inc.cuh ../common/rng.cuh
 # multiplicity (over-radiates) -- a leading-log shower wants 1-loop; offered for completeness.
 shower_fsr_2loop: shower_fsr.cu shower_inc.cuh ../common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -DAS_2LOOP -o $@ $<
+# ZFLAV = initial qqbar flavour from the Z hadronic branching fractions (default build: always d).
+# Makes b/c primaries -> realistic heavy-hadron content (D/B mesons); pair with -DHFDECAY for the
+# Z->bb/cc track boost. Validated: charge conserved per event, D~0.39/B~0.37 per event (right rate).
+shower_fsr_zflav: shower_fsr.cu shower_inc.cuh ../common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -DZFLAV -o $@ $<
 
 bridge: bridge.cu shower_inc.cuh ../common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
@@ -64,6 +69,12 @@ hadronize_mr: hadronize_mr.cu region_inc.cuh zlund_inc.cuh shower_inc.cuh ../com
 
 decay_test: decay_test.cu decay_inc.cuh bw_inc.cuh shower_inc.cuh ../common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
+
+# Dalitz ME-shape validator: decays omega/eta at rest, checks the P-wave edge-suppression and the
+# eta linear slope <y> appear ONLY with -DDALITZ_ME (the flat build is the control). In `make check`
+# we build+run the FLAT control (default, byte-stable); the ME build is exercised by `make checkhf`.
+dalitz_test: dalitz_test.cu decay_inc.cuh bw_inc.cuh shower_inc.cuh ../common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -DDECAYS -o $@ $<
 
 # Standalone validator of the Lund baryon flavour mechanism (copies the flavour functions from
 # hadronize_mr.cu; tiny kernel -> fast compile, unlike the full baryon hadronizer build).
@@ -88,10 +99,20 @@ hadronize_mr_decay: hadronize_mr.cu region_inc.cuh zlund_inc.cuh shower_inc.cuh 
 	$(NVCC) $(NVCCFLAGS) -DME_FIRST -DGLUON_SPLIT -DDECAYS -o $@ $<
 # BARYONS = Lund diquark baryon production (p/Lambda/Sigma/...). The flavour mechanism is validated
 # standalone by baryon_test (charge + baryon number conserved over 2M strings); this full build adds
-# it to the shower+hadronizer+decays chain. NB: -O3 ptxas on this combined kernel is extremely heavy
-# (can exhaust the compiler) -> use -O1. Decuplet/Sigma0 resonances decay (decay_inc.cuh, -DBARYONS).
+# it to the shower+hadronizer+decays chain. The combined kernel only compiles because the heavy device
+# functions are __noinline__ (one monstrous inlined __global__ otherwise exhausts cicc/ptxas) -> now
+# -O2 is fine (~10 min). Decuplet/Sigma0 resonances decay (decay_inc.cuh, -DBARYONS).
 hadronize_mr_baryon: hadronize_mr.cu region_inc.cuh zlund_inc.cuh shower_inc.cuh decay_inc.cuh bw_inc.cuh ../common/rng.cuh
-	$(NVCC) -O1 -std=c++17 -arch=$(ARCH) -DME_FIRST -DGLUON_SPLIT -DDECAYS -DBARYONS -o $@ $<
+	$(NVCC) -O2 -std=c++17 -arch=$(ARCH) -DME_FIRST -DGLUON_SPLIT -DDECAYS -DBARYONS -o $@ $<
+# Full-chain "best realistic physics": ME + g->qqbar + decays + baryons + Z-flavour init + heavy-flavour
+# (D/B) decays + Dalitz ME shapes. This is the build used for the real-data (ALEPH) comparison. Heavy
+# (~10-12 min at -O2; __noinline__ makes it tractable). HFDECAY needs ZFLAV/gsplit to make the c/b.
+hadronize_mr_max: hadronize_mr.cu region_inc.cuh zlund_inc.cuh shower_inc.cuh decay_inc.cuh bw_inc.cuh ../common/rng.cuh
+	$(NVCC) -O2 -std=c++17 -arch=$(ARCH) -DME_FIRST -DGLUON_SPLIT -DDECAYS -DBARYONS -DZFLAV -DHFDECAY -DDALITZ_ME -o $@ $<
+# Same realistic flavour + heavy decays but WITHOUT baryons (baryons are untuned -> they pull mult the
+# wrong way; this is the cleaner multiplicity/thrust build for ALEPH). ~8 min.
+hadronize_mr_hf: hadronize_mr.cu region_inc.cuh zlund_inc.cuh shower_inc.cuh decay_inc.cuh bw_inc.cuh ../common/rng.cuh
+	$(NVCC) -O2 -std=c++17 -arch=$(ARCH) -DME_FIRST -DGLUON_SPLIT -DDECAYS -DZFLAV -DHFDECAY -DDALITZ_ME -o $@ $<
 
 lhe_writer: lhe_writer.cu ../common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
@@ -112,6 +133,19 @@ check: all
 	./hadronize_mr 20000
 	./decay_test 500000
 	./baryon_test 2000000
+	./dalitz_test 1000000
+
+# Exercise the optional heavy-flavour / Dalitz precision flags (separate from `check` so the committed
+# byte-stable results are untouched). Validates D/B decays (conservation + GPU==CPU) and the Dalitz ME
+# shape (omega edge-suppression + eta <y><0 appear only with -DDALITZ_ME).
+checkhf: decay_test.cu dalitz_test.cu decay_inc.cuh bw_inc.cuh shower_inc.cuh ../common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -DDECAYS -DHFDECAY -DDALITZ_ME -o decay_test_hf decay_test.cu
+	./decay_test_hf 500000
+	$(NVCC) $(NVCCFLAGS) -DDECAYS -o dalitz_test_flat dalitz_test.cu
+	$(NVCC) $(NVCCFLAGS) -DDECAYS -DDALITZ_ME -o dalitz_test_me dalitz_test.cu
+	@echo "--- Dalitz: flat control vs ME (ME must edge-suppress omega and give eta <y> < 0) ---"
+	./dalitz_test_flat 2000000
+	./dalitz_test_me 2000000
 
 # Optional real-PDF tool — fills the device PDF grid from Pythia's real gluon PDF and
 # validates the interpolator vs it (needs Pythia + PYTHIA8DATA; not in `make check`).
@@ -131,6 +165,7 @@ hepmc3_writer: hepmc3_writer.cc
 	g++ -O2 $< -o $@ -I$(HEPMC3)/include -L$(HEPMC3)/lib -lHepMC3 -Wl,-rpath,$(HEPMC3)/lib
 
 clean:
-	rm -f $(STAGES) hepmc3_writer
+	rm -f $(STAGES) hepmc3_writer decay_test_hf dalitz_test_flat dalitz_test_me \
+	      hadronize_mr_full hadronize_mr_max hadronize_mr_hf hadronize_mr_baryon hadronize_mr_zf hadronize_mr_zfhf
 
-.PHONY: all check clean
+.PHONY: all check checkhf clean
