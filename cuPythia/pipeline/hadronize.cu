@@ -97,7 +97,13 @@ __host__ __device__ inline void boostBy(const double* q,double ex,double ey,doub
 }
 
 // One attempt at fragmenting the string; returns nHadrons or -1 on failure (caller retries).
-__host__ __device__ inline int tryFragment(double E,int flA,int flB,uint64_t& ctr,double* H,int* hid){
+#ifdef USE_BW
+#include "bw_inc.cuh"
+#define HADMASS(pdg,ctr) sampleBWmass(pdg, mesonMass(pdg), ctr)   // Breit-Wigner vector masses
+#else
+#define HADMASS(pdg,ctr) mesonMass(pdg)                            // pole masses (default)
+#endif
+__host__ __device__ inline int tryFragment(double E,int flA,int flB,uint64_t& ctr,double* H,int* hid,double* hm){
   double w2=4.0*E*E;                      // (2E)^2 = s
   double xPos=1.0,xNeg=1.0;               // remaining light-cone fractions
   int fPos=flA, fNeg=flB;                 // + end quark, - end antiquark (flB<0)
@@ -113,7 +119,7 @@ __host__ __device__ inline int tryFragment(double E,int flA,int flB,uint64_t& ct
       int endFlav=fromPos?fPos:fNeg;
       pdg=combineMeson(endFlav, fromPos?-fNew:fNew, ctr);  // endpoint + new (anti)quark
       pairPT(ctr,gx,gy);
-      if(pdg!=0){ mh=mesonMass(pdg);
+      if(pdg!=0){ mh=HADMASS(pdg,ctr);
         hpx=(fromPos?pTpx:pTnx)-gx; hpy=(fromPos?pTpy:pTny)-gy; }
     }
     if(pdg==0) return -1;
@@ -132,7 +138,7 @@ __host__ __device__ inline int tryFragment(double E,int flA,int flB,uint64_t& ct
                  if(xPosHad>xPos) return -1; }
     double had[4]={hpx,hpy,(xPosHad-xNegHad)*E,(xPosHad+xNegHad)*E};
     if(n>=MAXH) return -1;
-    H[4*n]=had[0];H[4*n+1]=had[1];H[4*n+2]=had[2];H[4*n+3]=had[3]; hid[n]=pdg; n++;
+    H[4*n]=had[0];H[4*n+1]=had[1];H[4*n+2]=had[2];H[4*n+3]=had[3]; hid[n]=pdg; hm[n]=mh; n++;
     xPos-=xPosHad; xNeg-=xNegHad;
     for(int k=0;k<4;++k) pRem[k]-=had[k];
     if(fromPos){ fPos=fNew; pTpx=gx; pTpy=gy; } else { fNeg=-fNew; pTnx=gx; pTny=gy; }
@@ -145,7 +151,7 @@ __host__ __device__ inline int tryFragment(double E,int flA,int flB,uint64_t& ct
     fNew=pickFlav(ctr);
     pdg1=combineMeson(fPos,-fNew,ctr);
     pdg2=combineMeson(fNew,fNeg,ctr);
-    if(pdg1!=0&&pdg2!=0){ m1=mesonMass(pdg1); m2=mesonMass(pdg2); }
+    if(pdg1!=0&&pdg2!=0){ m1=HADMASS(pdg1,ctr); m2=HADMASS(pdg2,ctr); }
   }
   if(pdg1==0||pdg2==0) return -1;
   if(W<m1+m2) return -1;                   // doesn't fit -> caller refragments
@@ -156,48 +162,51 @@ __host__ __device__ inline int tryFragment(double E,int flA,int flB,uint64_t& ct
   double gA=pRem[3]/W, bx=pRem[0]/pRem[3],by=pRem[1]/pRem[3],bz=pRem[2]/pRem[3];
   double l1[4],l2[4]; boostBy(q1,bx,by,bz,gA,l1); boostBy(q2,bx,by,bz,gA,l2);
   if(n+2>MAXH) return -1;
-  H[4*n]=l1[0];H[4*n+1]=l1[1];H[4*n+2]=l1[2];H[4*n+3]=l1[3]; hid[n]=pdg1; n++;
-  H[4*n]=l2[0];H[4*n+1]=l2[1];H[4*n+2]=l2[2];H[4*n+3]=l2[3]; hid[n]=pdg2; n++;
+  H[4*n]=l1[0];H[4*n+1]=l1[1];H[4*n+2]=l1[2];H[4*n+3]=l1[3]; hid[n]=pdg1; hm[n]=m1; n++;
+  H[4*n]=l2[0];H[4*n+1]=l2[1];H[4*n+2]=l2[2];H[4*n+3]=l2[3]; hid[n]=pdg2; hm[n]=m2; n++;
   return n;
 }
-__host__ __device__ inline int hadronizeString(double E,int flA,int flB,uint64_t ctr,double* H,int* hid){
+__host__ __device__ inline int hadronizeString(double E,int flA,int flB,uint64_t ctr,double* H,int* hid,double* hm){
   for(int retry=0; retry<25; ++retry){
-    int n=tryFragment(E,flA,flB,ctr,H,hid);   // ctr advances continuously across retries
+    int n=tryFragment(E,flA,flB,ctr,H,hid,hm);   // ctr advances continuously across retries
     if(n>0) return n;
   }
   return -1;
 }
 
-__global__ void kern(int N,double E,uint64_t base,int* outN,int* outNc,double* outTot,double* outDm){
+__global__ void kern(int N,double E,uint64_t base,int* outN,int* outNc,double* outTot,double* outDm,double* outVm){
   int e=blockIdx.x*(int)blockDim.x+threadIdx.x; if(e>=N) return;
-  double H[MAXH*4]; int hid[MAXH];
-  int n=hadronizeString(E,2,-2, base+(uint64_t)e*0x9E3779B97F4A7C15ULL, H,hid);  // u-ubar string
+  double H[MAXH*4]; int hid[MAXH]; double hm[MAXH];
+  int n=hadronizeString(E,2,-2, base+(uint64_t)e*0x9E3779B97F4A7C15ULL, H,hid,hm);  // u-ubar string
   if(n<0){ outN[e]=-1; return; }
-  double s0=0,s1=0,s2=0,s3=0,dm=0; int nc=0;
+  double s0=0,s1=0,s2=0,s3=0,dm=0,rhoM=-1.0; int nc=0;
   for(int i=0;i<n;++i){ s0+=H[4*i];s1+=H[4*i+1];s2+=H[4*i+2];s3+=H[4*i+3];
     double m2=H[4*i+3]*H[4*i+3]-H[4*i]*H[4*i]-H[4*i+1]*H[4*i+1]-H[4*i+2]*H[4*i+2];
-    double mt=mesonMass(hid[i]); dm=fmax(dm,fabs(m2-mt*mt)); if(isCharged(hid[i])) nc++; }
-  outN[e]=n; outNc[e]=nc; outTot[4*e]=s0;outTot[4*e+1]=s1;outTot[4*e+2]=s2;outTot[4*e+3]=s3; outDm[e]=dm;
+    double mt=hm[i]; dm=fmax(dm,fabs(m2-mt*mt));         // on-shell vs the mass ACTUALLY used
+    if(isCharged(hid[i])) nc++;
+    if((abs(hid[i])==113||abs(hid[i])==213)&&rhoM<0.0) rhoM=hm[i]; }   // first rho mass (BW check)
+  outN[e]=n; outNc[e]=nc; outTot[4*e]=s0;outTot[4*e+1]=s1;outTot[4*e+2]=s2;outTot[4*e+3]=s3; outDm[e]=dm; outVm[e]=rhoM;
 }
 
 int main(int argc,char**argv){
   int N=(argc>1)?atoi(argv[1]):200000;
   double rootS=(argc>2)?atof(argv[2]):91.1876, E=0.5*rootS;
   int TPB=128, blocks=(N+TPB-1)/TPB; uint64_t base=0x4144ULL;
-  int *dN,*dNc; double *dTot,*dDm;
+  int *dN,*dNc; double *dTot,*dDm,*dVm;
   CK(cudaMalloc(&dN,(size_t)N*4)); CK(cudaMalloc(&dNc,(size_t)N*4));
-  CK(cudaMalloc(&dTot,(size_t)N*32)); CK(cudaMalloc(&dDm,(size_t)N*8));
+  CK(cudaMalloc(&dTot,(size_t)N*32)); CK(cudaMalloc(&dDm,(size_t)N*8)); CK(cudaMalloc(&dVm,(size_t)N*8));
 
   cudaEvent_t t0,t1; CK(cudaEventCreate(&t0)); CK(cudaEventCreate(&t1)); CK(cudaEventRecord(t0));
-  kern<<<blocks,TPB>>>(N,E,base,dN,dNc,dTot,dDm); CK(cudaEventRecord(t1)); CK(cudaEventSynchronize(t1));
+  kern<<<blocks,TPB>>>(N,E,base,dN,dNc,dTot,dDm,dVm); CK(cudaEventRecord(t1)); CK(cudaEventSynchronize(t1));
   float ms=0; CK(cudaEventElapsedTime(&ms,t0,t1));
-  std::vector<int> hN(N),hNc(N); std::vector<double> hTot((size_t)N*4),hDm(N);
+  std::vector<int> hN(N),hNc(N); std::vector<double> hTot((size_t)N*4),hDm(N),hVm(N);
   CK(cudaMemcpy(hN.data(),dN,(size_t)N*4,cudaMemcpyDeviceToHost));
   CK(cudaMemcpy(hNc.data(),dNc,(size_t)N*4,cudaMemcpyDeviceToHost));
   CK(cudaMemcpy(hTot.data(),dTot,(size_t)N*32,cudaMemcpyDeviceToHost));
   CK(cudaMemcpy(hDm.data(),dDm,(size_t)N*8,cudaMemcpyDeviceToHost));
+  CK(cudaMemcpy(hVm.data(),dVm,(size_t)N*8,cudaMemcpyDeviceToHost));
   // reproducibility
-  std::vector<int> hN2(N); kern<<<blocks,TPB>>>(N,E,base,dN,dNc,dTot,dDm); CK(cudaDeviceSynchronize());
+  std::vector<int> hN2(N); kern<<<blocks,TPB>>>(N,E,base,dN,dNc,dTot,dDm,dVm); CK(cudaDeviceSynchronize());
   CK(cudaMemcpy(hN2.data(),dN,(size_t)N*4,cudaMemcpyDeviceToHost));
 
   double maxMom=0,maxDm=0; long sumN=0,sumNc=0,nFail=0,repro=0;
@@ -210,9 +219,14 @@ int main(int argc,char**argv){
 
   // GPU vs CPU determinism (subset): same nHadrons AND same hadron-id sequence
   int nCPU=(N<20000)?N:20000; long structSame=0;
-  std::vector<double> H(MAXH*4); std::vector<int> id(MAXH);
-  for(int e=0;e<nCPU;++e){ int n=hadronizeString(E,2,-2, base+(uint64_t)e*0x9E3779B97F4A7C15ULL,H.data(),id.data());
+  std::vector<double> H(MAXH*4),hmc(MAXH); std::vector<int> id(MAXH);
+  for(int e=0;e<nCPU;++e){ int n=hadronizeString(E,2,-2, base+(uint64_t)e*0x9E3779B97F4A7C15ULL,H.data(),id.data(),hmc.data());
     if(n==hN[e]) structSame++; }
+
+  // Breit-Wigner spectrum check: rho mass mean + RMS (pole when -DUSE_BW off -> RMS=0).
+  long nRho=0; double sumM=0,sumM2=0;
+  for(int e=0;e<N;++e) if(hN[e]>=0 && hVm[e]>0.0){ nRho++; sumM+=hVm[e]; sumM2+=hVm[e]*hVm[e]; }
+  double rhoMean=(nRho?sumM/nRho:0), rhoRMS=(nRho?sqrt(fmax(0.0,sumM2/nRho-rhoMean*rhoMean)):0);
 
   printf("GPU Lund string fragmentation (u-ubar, sqrt(s)=%.4f GeV, %d events)\n",rootS,N);
   printf("  throughput        : %.1f ms (%.2f M strings/s)\n",ms,N/ms/1e3);
@@ -222,8 +236,14 @@ int main(int argc,char**argv){
   printf("  refragment/fail   : failed events  = %ld / %d\n",nFail,N);
   printf("  reproducibility   : GPU re-run diffs = %ld\n",repro);
   printf("  GPU vs CPU        : nHadrons identical %ld/%d = %.2f%%\n",structSame,nCPU,100.0*structSame/nCPU);
-  bool ok=(maxMom<1e-6)&&(maxDm<1e-6)&&(repro==0)&&(nFail<N/100)&&(structSame==nCPU)&&(meanNc>2.0&&meanNc<30.0);
-  printf("VALIDATION: %s (conservation+on-shell+reproducible+GPU==CPU+sane multiplicity)\n",ok?"PASS":"FAIL");
-  cudaFree(dN);cudaFree(dNc);cudaFree(dTot);cudaFree(dDm);
+  printf("  rho mass spectrum : mean %.4f GeV, RMS %.4f (pole 0.7753, width 0.149; %ld rhos)\n",rhoMean,rhoRMS,nRho);
+#ifdef USE_BW
+  bool bwOK=(fabs(rhoMean-0.7753)<0.02)&&(rhoRMS>0.05);   // BW broadened around the pole
+#else
+  bool bwOK=(rhoRMS<1e-2);                                 // pole masses: no spread (FP-noise ~1e-5)
+#endif
+  bool ok=(maxMom<1e-6)&&(maxDm<1e-6)&&(repro==0)&&(nFail<N/100)&&(structSame==nCPU)&&(meanNc>2.0&&meanNc<30.0)&&bwOK;
+  printf("VALIDATION: %s (conservation+on-shell+reproducible+GPU==CPU+multiplicity+BW-spectrum)\n",ok?"PASS":"FAIL");
+  cudaFree(dN);cudaFree(dNc);cudaFree(dTot);cudaFree(dDm);cudaFree(dVm);
   return ok?0:2;
 }

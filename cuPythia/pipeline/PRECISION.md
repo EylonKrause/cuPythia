@@ -55,8 +55,12 @@ These are real precision advantages, but of *method* (reproducibility, statistic
    refinement; a full-event tune would re-fit α_s(M_Z) since CMW raises the multiplicity.)
 3. **g→qq̄ in the shower** — restores the missing splitting (correct flavour/multiplicity);
    needs multi-string bookkeeping (a gluon→qqbar splits the colour chain).
-4. **Breit–Wigner resonance masses** in hadronization (ρ, K*, ω, φ, …) — correct mass
-   spectrum instead of pole masses.
+4. **Breit–Wigner vector masses — DONE & VALIDATED** (`bw_inc.cuh`, `-DUSE_BW`). Vector
+   mesons (ρ, K*, ω, φ) get a relativistic Breit-Wigner mass (Lorentzian in s, truncated ±3Γ,
+   exact inverse-CDF, one RNG draw, on-shell check uses the *sampled* mass). On the straight-
+   string hadronizer the ρ spectrum is correctly broadened: **mean 0.779 (pole 0.775), RMS
+   0.132 ≈ Γ=0.149**, with 4-momentum conservation still exact (5.7e-14) and multiplicity
+   unchanged. Default (pole) build is unaffected. (Same drop-in applies to `hadronize_mr.cu`.)
 5. **Real PDF — DONE & VALIDATED.** `genpdf.cc` fills the `pdf.cuh` log-x/log-Q² grid from
    Pythia 8.317's **real proton gluon PDF** (the default NNPDF set) and the device interpolator
    reproduces it to **3.24e-3** in the σ-support region (xf_g(0.01,100)=7.9801 vs 7.9796) —
