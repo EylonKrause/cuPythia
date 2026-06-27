@@ -116,13 +116,29 @@ These are real precision advantages, but of *method* (reproducibility, statistic
    (no baryons ~5–6%, heavy flavour only via g→qqbar, flat Dalitz, untuned Lund, no detector); π⁰/K_S
    kept stable per the Rivet particle-level convention. v1 = light-unstable-meson 2-/3-body flat phase
    space; D/B left stable.
-8. **NLO matching** (POWHEG/MC@NLO) — the genuine remaining frontier (a research program, not a
+8. **Baryon production — DONE & VALIDATED (flavour mechanism)** (`-DBARYONS`, in `hadronize_mr.cu`;
+   validator `baryon_test.cu` in `make check`; decay rows in `decay_inc.cuh`). The Lund diquark
+   mechanism, ported faithfully from Pythia 8.317 `FragmentationFlavZpT.cc` (`pick()` diquark-vs-quark
+   + `combineId` SU(6) Clebsch–Gordan with octet/decuplet split and Λ/Σ disambiguation): a string
+   break makes a diquark–antidiquark pair (prob `probQQtoQ`=0.081), forming p/n/Λ/Σ/Ξ/Ω/Δ/Σ*/Ξ* with
+   the correct Pythia sign conventions; decuplet + Σ⁰ resonances decay. **Validated:** electric-charge
+   and **baryon-number conservation 0 / 2,000,000 strings** (`baryon_test`), and 4-momentum exact
+   (1.23e-10) in the full hadronizer. **The validator earned its keep — it caught two real bugs that
+   exact 4-momentum conservation completely masked:** (a) a finalTwo *two-diquark* combine →
+   baryon-number violation (fixed: finalTwo uses a single qq̄ pair), and (b) out-of-scope *charm/bottom
+   baryons* from g→qqbar endpoints → charge violation (fixed: baryon breaks only off light uds
+   endpoints; c/b stays D/B mesons). **Honest caveats:** v1 is light (uds) baryons, octet+decuplet,
+   no popcorn, untuned `probQQtoQ`; charm/bottom baryons deferred with the c/b program. **Build note:**
+   `-O3` ptxas on the *combined* shower+hadronizer+decays+baryons kernel is extremely heavy on this
+   box (can exhaust the compiler) — the `hadronize_mr_baryon` target uses `-O1`; the default `-O3`
+   build (baryons off) is unaffected and byte-identical.
+9. **NLO matching** (POWHEG/MC@NLO) — the genuine remaining frontier (a research program, not a
    flag): it requires the NLO virtual+real subtraction and a matching scheme, beyond this LL/LO
    port. Documented honestly as out of scope rather than approximated. (The first-emission ME
    correction, item 1, already supplies the O(α_s) real ME for the hardest emission.)
 
-Items 1–7 are DONE & VALIDATED (all opt-in via `-D` flags so the committed LL/LO results stay
-byte-stable); item 8 (NLO matching) is the genuine remaining frontier, documented honestly rather
+Items 1–8 are DONE & VALIDATED (all opt-in via `-D` flags so the committed LL/LO results stay
+byte-stable); item 9 (NLO matching) is the genuine remaining frontier, documented honestly rather
 than approximated. The g→qqbar addition (item 3) was the last *correctness* gap (flavour/string
 topology), not just a precision knob — it took a dedicated research+design pass to get the sharing,
 masses and colour-fork right. Item 6 (2-loop α_s) is an honest *negative* result: implemented

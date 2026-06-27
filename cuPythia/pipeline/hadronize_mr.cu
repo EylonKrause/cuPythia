@@ -48,10 +48,26 @@ __host__ __device__ inline double mesonMassMR(int pdg){
     case 321:return 0.49368; case 311:return 0.49761; case 130: case 310:return 0.49761; case 22:return 0.0;
     case 213:return 0.77526; case 113:return 0.77526; case 223:return 0.78266; case 333:return 1.01946;
     case 323:return 0.89167; case 313:return 0.89555;
+    // baryon octet (spinBar=2) + decuplet (spinBar=4) -- only hit under -DBARYONS
+    case 2212:return 0.93827; case 2112:return 0.93957; case 3122:return 1.11568;
+    case 3112:return 1.19745; case 3212:return 1.19264; case 3222:return 1.18937;
+    case 3312:return 1.32171; case 3322:return 1.31486;
+    case 1114: case 2114: case 2214: case 2224: return 1.23200;
+    case 3114:return 1.38720; case 3214:return 1.38370; case 3224:return 1.38280;
+    case 3314:return 1.53500; case 3324:return 1.53180; case 3334:return 1.67245;
   } return -1.0;
 }
-__host__ __device__ inline double constMassMR(int a){ return (a==3)?0.5:0.33; }
-__host__ __device__ inline bool isChargedMR(int pdg){ int a=abs(pdg); return a==211||a==321||a==213||a==323; }
+// Constituent mass: quarks u,d=0.33, s=0.5; a diquark (code>1000) = sum of its two quark const masses.
+// Non-recursive (recursive __device__ functions risk stack/illegal-access on GPU).
+__host__ __device__ inline double constMassMR(int a){
+  a=abs(a);
+  if(a>1000){ int q1=a/1000, q2=(a/100)%10; return ((q1==3)?0.5:0.33)+((q2==3)?0.5:0.33); }
+  return (a==3)?0.5:0.33;
+}
+__host__ __device__ inline bool isChargedMR(int pdg){ int a=abs(pdg);
+  // charged mesons + charged baryons (p, Sigma+-, Xi-, Omega-, Delta-/+/++) -- baryons only with -DBARYONS
+  return a==211||a==321||a==213||a==323||a==2212||a==3222||a==3112||a==3312||a==3334
+       ||a==1114||a==2214||a==2224||a==3114||a==3224||a==3314; }
 __host__ __device__ inline int pickFlavMR(uint64_t& c){ double r=u01(splitmix64(c++))*(2.0+H_PROBSTOUD); return (r<1.0)?1:((r<2.0)?2:3); }
 __host__ __device__ inline int combineMesonMR(int id1,int id2,uint64_t& c){
   int a1=abs(id1),a2=abs(id2),idMax=(a1>a2)?a1:a2,idMin=(a1<a2)?a1:a2;
@@ -65,6 +81,58 @@ __host__ __device__ inline int combineMesonMR(int id1,int id2,uint64_t& c){
     if(idM==221&&H_ETASUP<u01(splitmix64(c++)))return 0; if(idM==331&&H_ETAPSUP<u01(splitmix64(c++)))return 0; }
   return idM;
 }
+#ifdef BARYONS
+// ---- Lund diquark/baryon production (first pass: spin-0+1 diquarks, octet+decuplet, uds, NO
+// popcorn; ported from Pythia 8.317 FragmentationFlavZpT.cc pick():201-291 + combineId:352-382).
+// Behind -DBARYONS. Counter-RNG, deterministic (host==device); flag-off path untouched. ----
+static const double H_PROBQQTOQ=0.081, H_PROBSQTOQQ=0.915, H_PROBQQ1TOQQ0=0.0275, H_DECUPLETSUP=1.0;
+// SU(6) Clebsch-Gordan (FragFlav:29-32) + the weighted sum/max, as accessors (no device-visible arrays).
+__host__ __device__ inline double bCGoct(int i){ const double v[6]={0.75,0.5,0.0,0.1667,0.0833,0.1667}; return v[i]; }
+__host__ __device__ inline double bCGdec(int i){ const double v[6]={0.0,0.0,1.0,0.3333,0.6667,0.3333}; return v[i]; }
+__host__ __device__ inline double bCGsum(int i){ return bCGoct(i)+H_DECUPLETSUP*bCGdec(i); }
+__host__ __device__ inline double bCGmax(int i){  // pairwise max per spinFlav grouping (FragFlav:115-120)
+  double m01=fmax(bCGsum(0),bCGsum(1)), m23=fmax(bCGsum(2),bCGsum(3)), m45=fmax(bCGsum(4),bCGsum(5));
+  return (i<2)?m01:((i<4)?m23:m45); }
+// Diquark constituent flavour 1..3 (s suppressed by probSQtoQQ*probStoUD).
+__host__ __device__ inline int pickDiqFlav(uint64_t& c){
+  double r=(2.0+H_PROBSQTOQQ*H_PROBSTOUD)*u01(splitmix64(c++)); return (r<1.0)?1:((r<2.0)?2:3); }
+// New flavour at a break: signed quark (meson) or signed diquark (baryon), Pythia pick() sign
+// convention so hadron=combineHadronMR(oldFlav,flavNew) and the new endpoint = -flavNew.
+__host__ __device__ inline int pickFlavBreakMR(int oldFlav,uint64_t& c){
+  int idOld=abs(oldFlav); bool doOldB=(idOld>1000);
+  bool roll=((1.0+H_PROBQQTOQ)*u01(splitmix64(c++))>1.0);    // ALWAYS 1 draw (host==device phase)
+  bool doNewB=(!doOldB)&&(idOld<4)&&roll;                     // light (uds) endpoints only -> no charm/bottom
+                                                             // baryons (deferred with the c/b program); c/b end -> D/B meson
+  if(!doNewB){ int q=pickFlavMR(c); if((oldFlav>0&&oldFlav<9)||oldFlav<-1000) q=-q; return q; }
+  int idP=pickDiqFlav(c), idV=pickDiqFlav(c);
+  if(idP<3&&idV<3){ idV=idP; if(u01(splitmix64(c++))>0.5) idV=3-idP; } else (void)u01(splitmix64(c++));
+  int spin=3; if(idV!=idP){ if((1.0+3.0*H_PROBQQ1TOQQ0)*u01(splitmix64(c++))<1.0) spin=1; } else (void)u01(splitmix64(c++));
+  int dq=1000*((idV>idP)?idV:idP)+100*((idV<idP)?idV:idP)+spin;
+  if((oldFlav<0&&oldFlav>-9)||oldFlav>1000) dq=-dq; return dq; }
+// diquark+quark -> signed baryon, or 0 on SU(6) rejection (caller retries). FragFlav combineId:352-382.
+__host__ __device__ inline int combineBaryonMR(int id1,int id2,uint64_t& c){
+  int a1=abs(id1),a2=abs(id2),idMax=(a1>a2)?a1:a2,idMin=(a1<a2)?a1:a2;
+  int idQQ1=idMax/1000, idQQ2=(idMax/100)%10, spinQQ=idMax%10;
+  int sf=spinQQ-1; if(sf==2&&idQQ1!=idQQ2) sf=4; if(idMin!=idQQ1&&idMin!=idQQ2) sf++;
+  if(sf<0||sf>5) return 0;
+  if(bCGsum(sf) < u01(splitmix64(c++))*bCGmax(sf)) return 0;
+  int o1=(idMin>idQQ1)?((idMin>idQQ2)?idMin:idQQ2):((idQQ1>idQQ2)?idQQ1:idQQ2);
+  int o3=(idMin<idQQ1)?((idMin<idQQ2)?idMin:idQQ2):((idQQ1<idQQ2)?idQQ1:idQQ2);
+  int o2=idMin+idQQ1+idQQ2-o1-o3;
+  int spinBar=(bCGsum(sf)*u01(splitmix64(c++)) < bCGoct(sf))?2:4;
+  bool lam=false;
+  if(spinBar==2&&o1>o2&&o2>o3){ lam=(spinQQ==1);
+    if(o1!=idMin&&spinQQ==1) lam=(u01(splitmix64(c++))<0.25);
+    else if(o1!=idMin)       lam=(u01(splitmix64(c++))<0.75);
+    else (void)u01(splitmix64(c++)); }
+  else (void)u01(splitmix64(c++));
+  int idB=lam?(1000*o1+100*o3+10*o2+spinBar):(1000*o1+100*o2+10*o3+spinBar);
+  return (id1>0)?idB:-idB; }
+// Dispatch: a diquark present -> baryon, else meson.
+__host__ __device__ inline int combineHadronMR(int id1,int id2,uint64_t& c){
+  if(abs(id1)>1000||abs(id2)>1000) return combineBaryonMR(id1,id2,c);
+  return combineMesonMR(id1,id2,c); }
+#endif
 __host__ __device__ inline void pairPTMR(uint64_t& c,double& gx,double& gy){
   double m=(u01(splitmix64(c++))<H_ENHF)?H_ENHW:1.0;
   double r=sqrt(-2.0*log(u01(splitmix64(c++))+1e-300)), ph=2.0*M_PI*u01(splitmix64(c++));
@@ -239,16 +307,23 @@ __host__ __device__ inline int tryFragmentMR(const double* P,const int* id,int n
   for(int step=0; step<MAXPART-2; ++step){
     bool fromPos=(u01(splitmix64(ctr++))<0.5);
     End& e = fromPos?pos:neg;
-    int pdg=0,fNew=0; double mHad=0,pxHad=0,pyHad=0,pxNew=0,pyNew=0,gx,gy;
+    // fSel = the SIGNED flavour that combines with e.flav; the new endpoint becomes -fSel. The meson
+    // path is exactly this convention with fSel=fromPos?-fNew:fNew, so -DBARYONS off is byte-identical.
+    int pdg=0,fSel=0; double mHad=0,pxHad=0,pyHad=0,pxNew=0,pyNew=0,gx,gy;
     for(int tr=0; tr<20 && pdg==0; ++tr){
-      fNew=pickFlavMR(ctr);
-      pdg=combineMesonMR(e.flav, fromPos?-fNew:fNew, ctr);
+#ifdef BARYONS
+      fSel=pickFlavBreakMR(e.flav, ctr);          // signed quark OR diquark (baryon)
+      pdg=combineHadronMR(e.flav, fSel, ctr);     // meson or baryon
+#else
+      int fNew=pickFlavMR(ctr); fSel=fromPos?-fNew:fNew;
+      pdg=combineMesonMR(e.flav, fSel, ctr);
+#endif
       pairPTMR(ctr,gx,gy);
       if(pdg!=0){ mHad=HADMASS_MR(pdg,ctr); pxNew=gx; pyNew=gy; pxHad=e.px+pxNew; pyHad=e.py+pyNew; }
     }
     if(pdg==0) return -1;
     double mT2Had=mHad*mHad+pxHad*pxHad+pyHad*pyHad;
-    double wMin=(H_STOPM+constMassMR(abs(pos.flav))+constMassMR(abs(neg.flav))+H_STOPNF*constMassMR(fNew))
+    double wMin=(H_STOPM+constMassMR(abs(pos.flav))+constMassMR(abs(neg.flav))+H_STOPNF*constMassMR(abs(fSel)))
                 *(1.0+(2.0*u01(splitmix64(ctr++))-1.0)*H_STOPSM);
     double w2Rem=pRem[3]*pRem[3]-pRem[0]*pRem[0]-pRem[1]*pRem[1]-pRem[2]*pRem[2];
     if(w2Rem<wMin*wMin) break;
@@ -259,12 +334,17 @@ __host__ __device__ inline int tryFragmentMR(const double* P,const int* id,int n
     // retry the hadron, refragmenting the whole string only as a last resort.
     int iPN,iNN; double xPN,xNN,GN,had[4],accMass=mHad; bool made=false;
     for(int ht=0; ht<24 && !made; ++ht){
-      int rpdg=0,rfNew=0; double rmHad=mHad,rpxHad=pxHad,rpyHad=pyHad,rpxNew=pxNew,rpyNew=pyNew,rmT2=mT2Had,rgx,rgy;
+      int rpdg=0,rfSel=0; double rmHad=mHad,rpxHad=pxHad,rpyHad=pyHad,rpxNew=pxNew,rpyNew=pyNew,rmT2=mT2Had,rgx,rgy;
       if(ht>0){ // redraw flavour+pT for retries (ht==0 reuses the already-drawn hadron)
-        for(int tr=0; tr<20 && rpdg==0; ++tr){ rfNew=pickFlavMR(ctr);
-          rpdg=combineMesonMR(e.flav, fromPos?-rfNew:rfNew, ctr); pairPTMR(ctr,rgx,rgy);
+        for(int tr=0; tr<20 && rpdg==0; ++tr){
+#ifdef BARYONS
+          rfSel=pickFlavBreakMR(e.flav, ctr); rpdg=combineHadronMR(e.flav, rfSel, ctr);
+#else
+          int rfNew=pickFlavMR(ctr); rfSel=fromPos?-rfNew:rfNew; rpdg=combineMesonMR(e.flav, rfSel, ctr);
+#endif
+          pairPTMR(ctr,rgx,rgy);
           if(rpdg!=0){ rmHad=HADMASS_MR(rpdg,ctr); rpxNew=rgx; rpyNew=rgy; rpxHad=e.px+rpxNew; rpyHad=e.py+rpyNew; } }
-        if(rpdg==0) continue; rmT2=rmHad*rmHad+rpxHad*rpxHad+rpyHad*rpyHad; pdg=rpdg; fNew=rfNew;
+        if(rpdg==0) continue; rmT2=rmHad*rmHad+rpxHad*rpxHad+rpyHad*rpyHad; pdg=rpdg; fSel=rfSel;
         mHad=rmHad; pxNew=rpxNew; pyNew=rpyNew;
       }
       double z=zLundSample(H_ALUND,H_BLUND*rmT2,1.0,ctr);
@@ -276,7 +356,7 @@ __host__ __device__ inline int tryFragmentMR(const double* P,const int* id,int n
     if(!made) return -1;
     if(nH>=MAXPART) return -1;
     for(int k=0;k<4;++k){ H[4*nH+k]=had[k]; pRem[k]-=had[k]; } hid[nH]=pdg; hm[nH]=accMass; nH++;
-    e.iPos=iPN; e.iNeg=iNN; e.xPos=xPN; e.xNeg=xNN; e.Gamma=GN; e.px=-pxNew; e.py=-pyNew; e.flav=fromPos?fNew:-fNew;
+    e.iPos=iPN; e.iNeg=iNN; e.xPos=xPN; e.xNeg=xNN; e.Gamma=GN; e.px=-pxNew; e.py=-pyNew; e.flav=-fSel; // newEnd=-(combining flav)
   }
   // finalTwo (port of :1640-1716). pT and wT2 are independent of the final flavour, so fix
   // them first, then retry the flavour pair until the two hadrons fit the remaining mass
@@ -288,11 +368,22 @@ __host__ __device__ inline int tryFragmentMR(const double* P,const int* id,int n
   double negpxHad =neg.px+0.5*pxRem, negpyHad =neg.py+0.5*pyRem;
   double wT2=(pRem[3]*pRem[3]-pRem[0]*pRem[0]-pRem[1]*pRem[1]-pRem[2]*pRem[2])
              +(pos_pxHad+negpxHad)*(pos_pxHad+negpxHad)+(pos_pyHad+negpyHad)*(pos_pyHad+negpyHad);
-  int fNew=0,pdg1=0,pdg2=0; double m1=0,m2=0,m1T2=0,m2T2=0,lam2=-1.0;
+  int pdg1=0,pdg2=0; double m1=0,m2=0,m1T2=0,m2T2=0,lam2=-1.0;
   for(int ft=0; ft<40 && lam2<=0.0; ++ft){
     int p1=0,p2=0;
-    for(int tr=0; tr<20 && (p1==0||p2==0); ++tr){ fNew=pickFlavMR(ctr);
-      p1=combineMesonMR(pos.flav,-fNew,ctr); p2=combineMesonMR(fNew,neg.flav,ctr); }
+    for(int tr=0; tr<20 && (p1==0||p2==0); ++tr){
+#ifdef BARYONS
+      // finalTwo: a SINGLE q-qbar pair only (no new diquark here). The ends are {+quark|-antidiquark}
+      // (pos) / {-antiquark|+diquark} (neg), so combineHadronMR(pos,-q)+combineHadronMR(+q,neg) forms
+      // meson/baryon/antibaryon correctly in all 4 cases; making a new diquark would combine two
+      // diquarks -> garbage (charge/B violation). pickFlavMR gives the +quark.
+      int fNew=pickFlavMR(ctr);
+      p1=combineHadronMR(pos.flav,-fNew,ctr); p2=combineHadronMR(fNew,neg.flav,ctr);
+#else
+      int fNew=pickFlavMR(ctr);
+      p1=combineMesonMR(pos.flav,-fNew,ctr); p2=combineMesonMR(fNew,neg.flav,ctr);
+#endif
+    }
     if(p1==0||p2==0) continue;
     double mm1=HADMASS_MR(p1,ctr), mm2=HADMASS_MR(p2,ctr);
     double t1=mm1*mm1+pos_pxHad*pos_pxHad+pos_pyHad*pos_pyHad;

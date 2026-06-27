@@ -32,13 +32,22 @@ __host__ __device__ inline double dPoleMass(int ap){
     case 221: return 0.54786; case 331: return 0.95778;
     case 113: return 0.77526; case 213: return 0.77526; case 223: return 0.78266; case 333: return 1.01946;
     case 313: return 0.89555; case 323: return 0.89167;
+    // stable baryons (decay products) -- only reached under -DBARYONS
+    case 2212: return 0.93827; case 2112: return 0.93957; case 3122: return 1.11568;
+    case 3112: return 1.19745; case 3212: return 1.19264; case 3222: return 1.18937;
+    case 3312: return 1.32171; case 3322: return 1.31486; case 3334: return 1.67245;
   } return 0.0;
 }
 // Charge conjugate (flip non-self-conjugate ids; keep pi0/eta/eta'/rho0/omega/phi/gamma/K_L/K_S).
 __host__ __device__ inline int ccDec(int p){
   switch(p){ case 211:return -211; case -211:return 211; case 321:return -321; case -321:return 321;
     case 213:return -213; case -213:return 213; case 323:return -323; case -323:return 323;
-    case 311:return -311; case -311:return 311; case 313:return -313; case -313:return 313; }
+    case 311:return -311; case -311:return 311; case 313:return -313; case -313:return 313;
+    // baryon products (antibaryon parents conjugate their products) -- only under -DBARYONS
+    case 2212:return -2212; case -2212:return 2212; case 2112:return -2112; case -2112:return 2112;
+    case 3122:return -3122; case -3122:return 3122; case 3222:return -3222; case -3222:return 3222;
+    case 3212:return -3212; case -3212:return 3212; case 3112:return -3112; case -3112:return 3112;
+    case 3312:return -3312; case -3312:return 3312; case 3322:return -3322; case -3322:return 3322; }
   return p;
 }
 
@@ -47,30 +56,49 @@ __host__ __device__ inline int ccDec(int p){
 // host and device). 9 parent rows, 32 channels. Per-channel BR renormalized to 1.0 per parent;
 // products SIGNED PDG; antiparticle parents (pid<0) conjugate products at runtime via ccDec.
 // Rows: 0 eta(221) 1 eta'(331) 2 rho0(113) 3 rho+(213) 4 omega(223) 5 phi(333) 6 K*0(313) 7 K*+(323) 8 K0(311).
+// Under -DBARYONS the table gains 10 baryon-resonance parents (rows 9-18) / 20 channels (32-51):
+// Delta++,Delta+,Delta0,Delta- -> N pi; Sigma*+/0/- -> Lambda/Sigma pi; Xi*0/- -> Xi pi; Sigma0 -> Lambda gamma.
+// (The weak baryons p,n,Lambda,Sigma+-,Xi-,Xi0,Omega- are kept STABLE at particle level, no rows.)
 __host__ __device__ inline int dRow(int pdg){
+  int a=abs(pdg);
+#ifdef BARYONS
+  constexpr int PP[19]={221,331,113,213,223,333,313,323,311, 2224,2214,2114,1114,3224,3214,3114,3324,3314,3212};
+  for(int i=0;i<19;++i) if(PP[i]==a) return i; return -1;
+#else
   constexpr int PP[9]={221,331,113,213,223,333,313,323,311};
-  int a=abs(pdg); for(int i=0;i<9;++i) if(PP[i]==a) return i; return -1;   // -1 = STABLE
+  for(int i=0;i<9;++i) if(PP[i]==a) return i; return -1;   // -1 = STABLE
+#endif
 }
 __host__ __device__ inline void dParentInfo(int row,int& first,int& nch){
+#ifdef BARYONS
+  constexpr int PF[19]={0,4,9,12,14,17,24,27,30, 32,33,35,37,38,41,44,47,49,51};
+  constexpr int PN[19]={4,5,3,2,3,7,3,3,2, 1,2,2,1,3,3,3,2,2,1};
+#else
   constexpr int PF[9]={0,4,9,12,14,17,24,27,30}, PN[9]={4,5,3,2,3,7,3,3,2};
+#endif
   first=PF[row]; nch=PN[row];
 }
 __host__ __device__ inline double dChanBR(int ci){
-  constexpr double B[32]={0.3931,0.3257,0.2274,0.0460, 0.4366,0.2947,0.2173,0.0277,0.0219,
+  constexpr double B[52]={0.3931,0.3257,0.2274,0.0460, 0.4366,0.2947,0.2173,0.0277,0.0219,
     0.9988,0.0006,0.0006, 0.99955,0.00045, 0.8995,0.0835,0.0154,
-    0.4893,0.3422,0.0421,0.0421,0.0421,0.0270,0.0131, 0.6649,0.3327,0.0024, 0.6660,0.3330,0.0010, 0.5,0.5};
+    0.4893,0.3422,0.0421,0.0421,0.0421,0.0270,0.0131, 0.6649,0.3327,0.0024, 0.6660,0.3330,0.0010, 0.5,0.5,
+    1.0, 0.667,0.333, 0.667,0.333, 1.0, 0.88,0.06,0.06, 0.88,0.06,0.06, 0.88,0.06,0.06, 0.67,0.33, 0.67,0.33, 1.0};
   return B[ci];
 }
 __host__ __device__ inline int dChanN(int ci){
-  constexpr int NP[32]={2,3,3,3, 3,2,3,2,2, 2,2,2, 2,2, 3,2,2, 2,2,2,2,2,3,2, 2,2,2, 2,2,2, 1,1};
+  constexpr int NP[52]={2,3,3,3, 3,2,3,2,2, 2,2,2, 2,2, 3,2,2, 2,2,2,2,2,3,2, 2,2,2, 2,2,2, 1,1,
+    2, 2,2, 2,2, 2, 2,2,2, 2,2,2, 2,2,2, 2,2, 2,2, 2};
   return NP[ci];
 }
 __host__ __device__ inline int dChanProd(int ci,int j){
-  constexpr int P0[32]={22,111,211,211, 211,113,111,223,22, 211,111,221, 211,211, 211,111,211,
-    321,130,-213,113,213,211,221, 321,311,311, 311,321,321, 130,310};
-  constexpr int P1[32]={22,111,-211,-211, -211,22,111,22,22, -211,22,22, 111,22, -211,22,-211,
-    -321,310,211,111,-211,-211,22, -211,111,22, 211,111,22, 0,0};
-  constexpr int P2[32]={0,111,111,22, 221,0,221,0,0, 0,0,0, 0,0, 111,0,0, 0,0,0,0,0,111,0, 0,0,0, 0,0,0, 0,0};
+  constexpr int P0[52]={22,111,211,211, 211,113,111,223,22, 211,111,221, 211,211, 211,111,211,
+    321,130,-213,113,213,211,221, 321,311,311, 311,321,321, 130,310,
+    2212, 2212,2112, 2112,2212, 2112, 3122,3222,3212, 3122,3222,3112, 3122,3212,3112, 3312,3322, 3322,3312, 3122};
+  constexpr int P1[52]={22,111,-211,-211, -211,22,111,22,22, -211,22,22, 111,22, -211,22,-211,
+    -321,310,211,111,-211,-211,22, -211,111,22, 211,111,22, 0,0,
+    211, 111,211, 111,-211, -211, 211,111,211, 111,-211,211, -211,-211,111, 211,111, -211,111, 22};
+  constexpr int P2[52]={0,111,111,22, 221,0,221,0,0, 0,0,0, 0,0, 111,0,0, 0,0,0,0,0,111,0, 0,0,0, 0,0,0, 0,0,
+    0, 0,0, 0,0, 0, 0,0,0, 0,0,0, 0,0,0, 0,0, 0,0, 0};
   return (j==0)?P0[ci]:((j==1)?P1[ci]:P2[ci]);
 }
 // Mass of a product (BW for vectors via bw_inc, pole otherwise) — ALWAYS exactly one RNG draw.
