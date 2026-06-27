@@ -32,14 +32,18 @@ int main(int argc,char**argv){
     int n; if(fscanf(f,"%d",&n)!=1) break;
     GenEvent evt(Units::GEV, Units::MM);
     evt.set_event_number(e);
+    // Incoming e- e+ beam pair (status 4) at sqrt(s)=Ecm, head-on along z, so Rivet identifies the
+    // e+e- beams and accepts the LEP1 analyses (which require an e+e- beam at ~91.2 GeV).
+    GenParticlePtr eMinus = std::make_shared<GenParticle>(FourVector(0,0, 0.5*Ecm, 0.5*Ecm),  11, 4);
+    GenParticlePtr ePlus  = std::make_shared<GenParticle>(FourVector(0,0,-0.5*Ecm, 0.5*Ecm), -11, 4);
     GenVertexPtr v = std::make_shared<GenVertex>();
-    // An incoming Z (the string's total 4-momentum, at rest at sqrt(s)) -> outgoing partons.
-    v->add_particle_in(std::make_shared<GenParticle>(FourVector(0,0,0,Ecm), 23, 4));
+    v->add_particle_in(eMinus); v->add_particle_in(ePlus);   // e+e- -> (Z) -> final state
     for(int i=0;i<n;++i){ int id,col,acol; double px,py,pz,en;
       if(fscanf(f,"%d %d %d %lf %lf %lf %lf",&id,&col,&acol,&px,&py,&pz,&en)!=7){ n=-1; break; }
       v->add_particle_out(std::make_shared<GenParticle>(FourVector(px,py,pz,en), id, 1)); }
     if(n<0) break;
     evt.add_vertex(v);
+    evt.set_beam_particles(eMinus, ePlus);
     writer.write_event(evt);
     nWrote++;
   }

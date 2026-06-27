@@ -67,6 +67,8 @@ cuPythia/pipeline/hadronize_mr_gsplit
 cuPythia/pipeline/multiplicity_pythia
 cuPythia/pipeline/hepmc3_writer
 cuPythia/pipeline/*.hepmc3
+cuPythia/pipeline/*.yoda
+cuPythia/pipeline/hadronize_mr_best
 cuPythia/pipeline/genpdf
 cuPythia/pipeline/real_pdf.grid
 cuPythia/pipeline/shower_partons.dat

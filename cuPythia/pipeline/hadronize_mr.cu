@@ -315,7 +315,8 @@ __host__ __device__ inline int hadronizeMR(const double* P,const int* id,int n,u
   return -1;
 }
 
-__global__ void kern(int N,uint64_t base,int* outN,int* outNc,double* outTot,double* outDm,int* outNp){
+__global__ void kern(int N,uint64_t base,int* outN,int* outNc,double* outTot,double* outDm,int* outNp,
+                     double* outH,int* outHid){
   int e=blockIdx.x*(int)blockDim.x+threadIdx.x; if(e>=N) return;
   double Psh[MAXP*4]; int idsh[MAXP];
   int np=showerEvent(Psh,idsh, base+(uint64_t)e*0x9E3779B97F4A7C15ULL);   // FSR shower chain
@@ -348,22 +349,37 @@ __global__ void kern(int N,uint64_t base,int* outN,int* outNc,double* outTot,dou
     double m2=H[4*i+3]*H[4*i+3]-H[4*i]*H[4*i]-H[4*i+1]*H[4*i+1]-H[4*i+2]*H[4*i+2];
     double mt=hm[i]; dm=fmax(dm,fabs(m2-mt*mt)); if(isChargedMR(hid[i]))nc++; }   // on-shell vs mass used
   outN[e]=nH; outNc[e]=nc; outTot[4*e]=s0;outTot[4*e+1]=s1;outTot[4*e+2]=s2;outTot[4*e+3]=s3; outDm[e]=dm;
+  // Optional per-event hadron record (for the HepMC3/Rivet dump; ignored unless main writes it).
+  for(int i=0;i<nH;++i){ for(int k=0;k<4;++k) outH[((size_t)e*MAXPART+i)*4+k]=H[4*i+k]; outHid[(size_t)e*MAXPART+i]=hid[i]; }
 }
 
 int main(int argc,char**argv){
   int N=(argc>1)?atoi(argv[1]):20000; uint64_t base=0x4D52ULL;
   int TPB=128, blocks=(N+TPB-1)/TPB;
-  int *dN,*dNc,*dNp; double *dTot,*dDm;
+  const char* dumpFile=(argc>2)?argv[2]:nullptr;   // optional: write per-event hadrons for HepMC3/Rivet
+  int *dN,*dNc,*dNp,*dHid; double *dTot,*dDm,*dH;
   CK(cudaMalloc(&dN,(size_t)N*4));CK(cudaMalloc(&dNc,(size_t)N*4));CK(cudaMalloc(&dNp,(size_t)N*4));CK(cudaMalloc(&dTot,(size_t)N*32));CK(cudaMalloc(&dDm,(size_t)N*8));
-  kern<<<blocks,TPB>>>(N,base,dN,dNc,dTot,dDm,dNp); CK(cudaDeviceSynchronize());
+  CK(cudaMalloc(&dH,(size_t)N*MAXPART*4*8));CK(cudaMalloc(&dHid,(size_t)N*MAXPART*4));
+  kern<<<blocks,TPB>>>(N,base,dN,dNc,dTot,dDm,dNp,dH,dHid); CK(cudaDeviceSynchronize());
   std::vector<int> hN(N),hNc(N),hNp(N); std::vector<double> hTot((size_t)N*4),hDm(N);
   CK(cudaMemcpy(hN.data(),dN,(size_t)N*4,cudaMemcpyDeviceToHost));
   CK(cudaMemcpy(hNc.data(),dNc,(size_t)N*4,cudaMemcpyDeviceToHost));
   CK(cudaMemcpy(hNp.data(),dNp,(size_t)N*4,cudaMemcpyDeviceToHost));
   CK(cudaMemcpy(hTot.data(),dTot,(size_t)N*32,cudaMemcpyDeviceToHost));
   CK(cudaMemcpy(hDm.data(),dDm,(size_t)N*8,cudaMemcpyDeviceToHost));
-  std::vector<int> hN2(N); kern<<<blocks,TPB>>>(N,base,dN,dNc,dTot,dDm,dNp); CK(cudaDeviceSynchronize());
+  std::vector<double> hH; std::vector<int> hHid;
+  if(dumpFile){ hH.resize((size_t)N*MAXPART*4); hHid.resize((size_t)N*MAXPART);
+    CK(cudaMemcpy(hH.data(),dH,(size_t)N*MAXPART*4*8,cudaMemcpyDeviceToHost));
+    CK(cudaMemcpy(hHid.data(),dHid,(size_t)N*MAXPART*4,cudaMemcpyDeviceToHost)); }
+  std::vector<int> hN2(N); kern<<<blocks,TPB>>>(N,base,dN,dNc,dTot,dDm,dNp,dH,dHid); CK(cudaDeviceSynchronize());
   CK(cudaMemcpy(hN2.data(),dN,(size_t)N*4,cudaMemcpyDeviceToHost));
+  if(dumpFile){ FILE* fo=fopen(dumpFile,"w");
+    if(fo){ long nValid=0; for(int e=0;e<N;++e) if(hN[e]>0) nValid++;
+      fprintf(fo,"%ld %.6f\n",nValid,MZ);
+      for(int e=0;e<N;++e){ if(hN[e]<=0) continue; fprintf(fo,"%d\n",hN[e]);
+        for(int i=0;i<hN[e];++i){ size_t b=((size_t)e*MAXPART+i)*4;
+          fprintf(fo,"%d 0 0 %.9e %.9e %.9e %.9e\n",hHid[(size_t)e*MAXPART+i],hH[b],hH[b+1],hH[b+2],hH[b+3]); } }
+      fclose(fo); printf("  dumped %ld hadron-level events -> %s\n",nValid,dumpFile); } }
 
   double maxMom=0,maxDm=0; long sumN=0,sumNc=0,nFail=0,repro=0;
   int npOkMax=0,npBadMin=1<<30; long nBadN2=0,nN2=0,nBadN3plus=0;  // diagnostic: which n fails
