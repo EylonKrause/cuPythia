@@ -40,7 +40,19 @@ counter-based, so any single event is **O(1)-reproducible** on any node.
   FSR-only, massless, q→qg & g→gg; the ~4% residual is g→qq̄ + exact-Λ α_s + MC statistics,
   and ME corrections are the LL→NLL next step. (NB: `TimeShower:nGluonToQuark=0` hangs
   Pythia 8.317, so the reference keeps g→qq̄ on.)
-- [ ] stage 4 — hadronization on device (feasibility-gated) + decays
+- [x] **stage 4 — `hadronize.cu`** (+ `zlund_inc.cuh`): a GPU **Lund string fragmentation**
+  chain, one string per thread. Faithful to Pythia 8.317: the **zLund f(z) sampler**
+  (validated in isolation vs the analytic form, `zlund_test.cu`, χ²/ndf≈1 in all three
+  envelope regimes), StringFlav meson selection (flavour 1:1:0.217, the always-drawn spin →
+  pseudoscalars **and** vectors, η/η′ suppression, uds mixing), StringPT pT (enhancedFraction
+  kept), constituent-mass stop test, light-cone kinematics, exact 2-body finalTwo with
+  refragment-on-failure. Validated on a single u-ū string at 91.2 GeV: 4-momentum
+  conservation **5.7e-14**, on-shellness **1.6e-12**, **100% GPU≡CPU** & reproducible, 0
+  failed events; and **vs Pythia** (matched single-string config, `multiplicity_pythia.cc`):
+  primary multiplicity **12.64 vs 12.15 (4.0%)**, charged **6.98 vs 6.68 (4.5%)**. Scope:
+  pseudoscalar+vector mesons, uds, pole masses, no baryons/decays/excited-mesons, single
+  straight string (not yet gluon-kinked) — the documented residuals. Not aware of a prior
+  *algorithmic* (non-ML) GPU Lund port; MLHad/HadML are learned surrogates.
 - [ ] stage 5 — standard I/O (spec-valid LHE / HepMC3 / Rivet smoke test)
 
 Design grounded in a web-research pass on GPU-generator architecture

@@ -4,7 +4,7 @@ NVCC      ?= /usr/local/cuda/bin/nvcc
 ARCH      ?= sm_120
 NVCCFLAGS ?= -O3 -std=c++17 -arch=$(ARCH)
 
-STAGES = build_events reweight generate pdf_xsec pdf_lumi_fft shower_fsr zlund_test
+STAGES = build_events reweight generate pdf_xsec pdf_lumi_fft shower_fsr zlund_test hadronize
 
 all: $(STAGES)
 
@@ -29,6 +29,9 @@ shower_fsr: shower_fsr.cu ../common/rng.cuh
 zlund_test: zlund_test.cu ../common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
 
+hadronize: hadronize.cu zlund_inc.cuh ../common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -o $@ $<
+
 # Build + validate every pipeline stage.
 check: all
 	./build_events 500000
@@ -38,6 +41,7 @@ check: all
 	./pdf_lumi_fft 15
 	./shower_fsr 200000
 	./zlund_test 2000000
+	./hadronize 200000
 
 clean:
 	rm -f $(STAGES)

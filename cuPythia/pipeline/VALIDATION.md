@@ -19,6 +19,8 @@ and an *identical CPU port* consume the same draws — enabling exact GPU-vs-CPU
 | 2 reweighting | `reweight.cu` | N scale weights in one pass == N independent pinned re-runs | **bit-identical (max\|diff\|=0)** |
 | orchestrator | `generate.cu` | build→reweight→unweight→CUB-compact on one record, no host round-trip; σ; CUB count | σ relerr 4.8e-5; CUB count **exact** |
 | 3 FSR shower | `shower_fsr.cu` | momentum cons.; on-shell; GPU re-run reproducibility; GPU-vs-CPU control flow; **thrust vs Pythia** | see below |
+| 4 hadronization | `hadronize.cu` | momentum cons.; on-shell; GPU≡CPU; reproducible; **multiplicity vs Pythia** | see below |
+| (unit) Lund f(z) | `zlund_test.cu` | sampled z vs analytic f(z), 3 regimes | χ²/ndf **0.98/1.05/0.92/0.91** |
 | (tool) FFT luminosity | `pdf_lumi_fft.cu` | cuFFT convolution vs direct O(N²) | agree **1.7e-7**, **94×/464×** faster |
 
 ## Stage 3 (the headline) — FSR dipole shower, in detail
@@ -48,6 +50,27 @@ Honest residuals / scope: FSR-only, massless, q→qg & g→gg. The ~4% LL residu
 the next step. An early far-tail (1−T>0.35) excess was traced to **the observable** (a
 4-seed thrust axis missing the true axis on rare multi-jet events), not the shower — it
 collapses when the axis is seeded from every particle.
+
+## Stage 4 — Lund string hadronization, in detail
+
+Setup: one straight u-ū colour-singlet string at √s = 91.1876 GeV, one string per GPU
+thread. Faithful port of Pythia 8.317 string fragmentation: the **zLund f(z) sampler**
+(validated standalone, χ²/ndf≈1 across z_max 0.09→0.93), StringFlav meson selection (the
+always-drawn spin → pseudoscalars **and** vectors, η/η′ suppression, uds mixing), StringPT
+pT (enhancedFraction draw kept), constituent-mass stop test, light-cone longitudinal
+kinematics, and an exact 2-body finalTwo with refragment-on-failure.
+
+Correctness: **4-momentum conservation 5.7e-14**, **on-shellness 1.6e-12**, GPU re-runs
+bit-identical, **100% GPU≡CPU** (same hadron count per event over 20k), **0 failed events**,
+2.7 M strings/s.
+
+Physics (vs Pythia `forceHadronLevel` on the identical single u-ū string,
+`multiplicity_pythia.cc`, decays+baryons off both sides): primary multiplicity
+**12.64 vs 12.15 (4.0%)**, charged **6.98 vs 6.68 (4.5%)**. The GPU being slightly high is
+consistent with the documented residuals (pole masses vs Pythia's Breit-Wigner vectors;
+simplified finalTwo). Honest scope: pseudoscalar+vector mesons, uds, pole masses, single
+straight string (no gluon kinks yet), no baryons/decays. Not aware of a prior *algorithmic*
+(non-ML) GPU Lund port.
 
 ## Reproducing
 ```bash
