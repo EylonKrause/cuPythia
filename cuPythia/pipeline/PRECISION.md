@@ -53,8 +53,11 @@ These are real precision advantages, but of *method* (reproducibility, statistic
    needs multi-string bookkeeping (a gluon→qqbar splits the colour chain).
 4. **Breit–Wigner resonance masses** in hadronization (ρ, K*, ω, φ, …) — correct mass
    spectrum instead of pole masses.
-5. **Real LHAPDF grid** instead of the toy PDF (the `pdf.cuh` log-x/log-Q² interpolator
-   already accepts a real `.dat` unchanged) — correct hard cross sections.
+5. **Real PDF — DONE & VALIDATED.** `genpdf.cc` fills the `pdf.cuh` log-x/log-Q² grid from
+   Pythia 8.317's **real proton gluon PDF** (the default NNPDF set) and the device interpolator
+   reproduces it to **3.24e-3** in the σ-support region (xf_g(0.01,100)=7.9801 vs 7.9796) —
+   the real-PDF analog of the toy validation. The grid (`real_pdf.grid`) drops into the same
+   arrays for a **physical** hadronic σ instead of the illustrative toy.
 6. **2-loop α_s** and **NLO matching** (POWHEG/MC@NLO) — the precision frontier.
 
 Items 2, 4, 5 are clean and tractable; item 1 (done correctly) is the biggest physics win;

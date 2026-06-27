@@ -59,6 +59,12 @@ check: all
 	./region_test
 	./hadronize_mr 20000
 
+# Optional real-PDF tool — fills the device PDF grid from Pythia's real gluon PDF and
+# validates the interpolator vs it (needs Pythia + PYTHIA8DATA; not in `make check`).
+PY8 ?= ../../pythia8317
+genpdf: genpdf.cc
+	g++ -O2 $< -o $@ $$($(PY8)/bin/pythia8-config --cxxflags --libs)
+
 # Optional HepMC3 output — needs HepMC3 installed in $(HEPMC3) (built from source to
 # ~/.local; not in `make check` since it is a non-standard dependency). Validates by readback.
 HEPMC3 ?= $(HOME)/.local
