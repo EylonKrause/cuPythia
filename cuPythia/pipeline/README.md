@@ -14,7 +14,11 @@ counter-based, so any single event is **O(1)-reproducible** on any node.
 - [x] **stage 0 — `build_events.cu`**: populate gg→gg hard-process events into the
   record on-GPU. Validated: exact 4-momentum conservation (**0 imbalance**), record
   integrity (all events well-formed), cross-section sanity vs quadrature.
-- [ ] stage 1 — PDF convolution + process selection (a real hadronic σ, not partonic)
+- [x] **stage 1 — `pdf_xsec.cu`**: device PDF evaluator (`pdf.cuh`: log-x/log-Q²
+  grid, **log(xf) bilinear interpolation** with edge freezing) convolved to a real
+  **hadronic** gg→gg σ (13 TeV pp, pT-hat>50 GeV). Validated: interp fidelity at the
+  σ level **1.7e-4**, GPU-vs-CPU on identical samples **1.4e-11** (determinism). A
+  real LHAPDF `.dat` grid plugs into the same arrays + interpolator with no kernel change.
 - [x] **stage 2 — `reweight.cu`**: N scale-variation weights per event in one pass,
   **bit-identical (max|diff|=0) to N independent pinned re-runs** (the counter-RNG
   advantage); physical ±25% LO scale band. μ_F/PDF variations await stage 1.

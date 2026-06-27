@@ -42,6 +42,7 @@ cuPythia/**/shower
 cuPythia/pipeline/build_events
 cuPythia/pipeline/reweight
 cuPythia/pipeline/generate
+cuPythia/pipeline/pdf_xsec
 cuPythia/pipeline/**/gen
 cuPythia/**/*.lhe
 cuPythia/**/err*.log
