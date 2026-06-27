@@ -71,10 +71,12 @@ public:
 
   // Constructor.
   InPair( int idAIn = 0, int idBIn = 0) : idA(idAIn), idB(idBIn),
-    pdfA(0.), pdfB(0.), pdfSigma(0.) {}
+    idxA(-1), idxB(-1), pdfA(0.), pdfB(0.), pdfSigma(0.) {}
 
   // Values.
   int    idA, idB;
+  // Precomputed beam-slot indices into inBeamA/inBeamB (-1 if none).
+  int    idxA, idxB;
   double pdfA, pdfB, pdfSigma;
 
 };

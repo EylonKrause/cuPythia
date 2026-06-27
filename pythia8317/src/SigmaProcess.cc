@@ -400,6 +400,15 @@ bool SigmaProcess::initFlux() {
     return false;
   }
 
+  // Precompute beam-slot indices for each colliding pair (O(1) per-event lookup
+  // in sigmaPDF). First matching slot, else -1, exactly as the old inner scans.
+  for (int i = 0; i < sizePair(); ++i) {
+    for (int j = 0; j < sizeBeamA(); ++j)
+      if (inPair[i].idA == inBeamA[j].id) { inPair[i].idxA = j; break; }
+    for (int j = 0; j < sizeBeamB(); ++j)
+      if (inPair[i].idB == inBeamB[j].id) { inPair[i].idxB = j; break; }
+  }
+
   return true;
 
 }
@@ -451,18 +460,14 @@ double SigmaProcess::sigmaPDF(bool initPS, bool samexGamma,
     inPair[i].pdfSigma = Kfactor
                        * sigmaHatWrap(inPair[i].idA, inPair[i].idB);
 
-    // Multiply by respective parton densities.
-    for (int j = 0; j < sizeBeamA(); ++j)
-    if (inPair[i].idA == inBeamA[j].id) {
-      inPair[i].pdfA      = inBeamA[j].pdf;
-      inPair[i].pdfSigma *= inBeamA[j].pdf;
-      break;
+    // Multiply by respective parton densities (O(1) precomputed slots).
+    if (inPair[i].idxA >= 0) {
+      inPair[i].pdfA      = inBeamA[inPair[i].idxA].pdf;
+      inPair[i].pdfSigma *= inBeamA[inPair[i].idxA].pdf;
     }
-    for (int j = 0; j < sizeBeamB(); ++j)
-    if (inPair[i].idB == inBeamB[j].id) {
-      inPair[i].pdfB      = inBeamB[j].pdf;
-      inPair[i].pdfSigma *= inBeamB[j].pdf;
-      break;
+    if (inPair[i].idxB >= 0) {
+      inPair[i].pdfB      = inBeamB[inPair[i].idxB].pdf;
+      inPair[i].pdfSigma *= inBeamB[inPair[i].idxB].pdf;
     }
 
     // Sum for all channels.
