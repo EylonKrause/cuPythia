@@ -9,7 +9,7 @@ CMW α_s, and is tuned to LEP/LHC data. cuPythia is a from-scratch GPU port with
 
 | aspect | Pythia 8 | cuPythia (this pipeline) |
 |---|---|---|
-| shower | NLL-ish, ME-corrected, g→qqbar, CMW α_s | **leading-log**, no ME corr, q→qg & g→gg, 1-loop α_s (threshold-matched) |
+| shower | NLL-ish, ME-corrected, g→qqbar, CMW α_s | **leading-log**, q→qg & g→gg (+ g→qqbar `-DGLUON_SPLIT`), 1-loop α_s (threshold-matched) |
 | hadronization | full Lund: BW masses, all multiplets, baryons, decays | pseudoscalar+vector, **pole masses**, uds, no baryons/decays |
 | hard process | NLO/merged, LHAPDF | LO gg→gg, toy PDF (real LHAPDF drops in) |
 | tuning | decades of data tunes | untuned (Pythia defaults) |
@@ -53,8 +53,30 @@ These are real precision advantages, but of *method* (reproducibility, statistic
    radiation: ⟨1−T⟩ 0.069→**0.0768**, matching Pythia with `alphaSuseCMW=on` (0.070→0.0791)
    to **5.4%** — confirming the NLL rescaling is implemented correctly. (It is a shower-soft
    refinement; a full-event tune would re-fit α_s(M_Z) since CMW raises the multiplicity.)
-3. **g→qq̄ in the shower** — restores the missing splitting (correct flavour/multiplicity);
-   needs multi-string bookkeeping (a gluon→qqbar splits the colour chain).
+3. **g→qq̄ shower splitting — DONE & VALIDATED** (`-DGLUON_SPLIT`, `shower_inc.cuh` +
+   `hadronize_mr.cu`). Adds the missing final-state gluon splitting as a second trial channel for
+   gluon radiators: the plain DGLAP kernel **T_R[z²+(1−z)²]** (T_R=½, flat-z), summed over flavours
+   with Pythia's quark masses (u,d=0.33, s=0.5, c=1.5, b=4.8) and the **THRESHM2=4.004** pair
+   threshold + β_Q. Three design points, each verified:
+   - **RNG phase-lock:** a fixed 5 draws/trial-iteration for *every* dipole end (the channel- and
+     flavour-draws are taken even for quark radiators, where they go unused) so control flow never
+     depends on parton flavour → **100% GPU≡CPU**. Flag OFF draws 3 → **byte-identical** to the
+     committed LL shower (mult 12.719, ⟨1−T⟩ 0.0690, and N_gqq=**0** exactly: the clean A/B gate).
+   - **No double-count:** a gluon sits in two dipoles and each end generates the trial, so the
+     single g→qqbar conversion is **shared ½ per end** (coefficient T_R·½ = Pythia's `wtPSqqbar`).
+     Without the ½ the rate came out 2.14× high.
+   - **Colour-string fork:** g→qqbar cuts the chain into two strings (q…q̄′)(q′…q̄); `findStrings`
+     slices at each q̄-then-q boundary and the hadronizer fragments each sub-string independently.
+   **Validation** (200k, vs Pythia `weightGluonToQuark=1` — the same plain kernel — MEcorr off,
+   reference counter `thrust_pythia g2q1`): secondary-pair rate **N_gqq = 0.578 vs 0.566 (+2.2%)**,
+   flavour-resolved uds +2.2%, **c +0.3%**, b +6.8%; thrust non-regression (0.0702 vs 0.0700, <1%);
+   hadron-level **4-momentum conservation exact (1.43e-10)** across the forked multi-string events,
+   reproducible, drop rate 3.0% (lower — forks simplify the region geometry). Hadron multiplicity
+   shifts −0.4% (20.92 vs 21.01): a g→qqbar replaces a multiplicity-enhancing gluon kink with a
+   quark string-break, so the small decrease is physical, not a regression. **Honest caveat:** the
+   GPU shower is massless and uses Pythia **option 1**; Pythia's *default* is option 4 (massive
+   zCosThe reshape + pow3(1−m²/m²_dip) damping → a lower 0.5233), which needs the massive-recoil
+   `doKin` path (future). So this validates the LL kernel, not the option-4 phenomenology.
 4. **Breit–Wigner vector masses — DONE & VALIDATED** (`bw_inc.cuh`, `-DUSE_BW`). Vector
    mesons (ρ, K*, ω, φ) get a relativistic Breit-Wigner mass (Lorentzian in s, truncated ±3Γ,
    exact inverse-CDF, one RNG draw, on-shell check uses the *sampled* mass). On the straight-
@@ -69,11 +91,14 @@ These are real precision advantages, but of *method* (reproducibility, statistic
    arrays for a **physical** hadronic σ instead of the illustrative toy.
 6. **2-loop α_s** and **NLO matching** (POWHEG/MC@NLO) — the precision frontier.
 
-Items 2, 4, 5 are clean and tractable; item 1 (done correctly) is the biggest physics win;
-items 3, 6 are research-scale.
+Items 1–5 are DONE & VALIDATED (six corrections total, all opt-in via `-D` flags so the
+committed LL/LO results stay byte-stable); item 6 is the remaining research frontier. The g→qqbar
+addition (item 3) was the last *correctness* gap (flavour/string topology), not just a precision
+knob — it took a dedicated research+design pass to get the sharing, masses and colour-fork right.
 
 ## Bottom line
 Pythia is the more physically precise generator. cuPythia's contribution is a
-**reproducible, GPU-native** generator validated at the LL/LO level (~4–7% vs Pythia), with
-a clear, prioritized path to higher theoretical precision — and an honest record that the
-naive ME correction over-corrects a dipole shower and must be derived for *this* shower.
+**reproducible, GPU-native** generator validated at the LL/LO level (~2–7% vs Pythia across six
+independent observables: thrust, multiplicity, g→qqbar rate, …), with a clear, prioritized path to
+higher theoretical precision — and an honest record (the naive ME correction over-corrects a dipole
+shower; the g→qqbar rate matches Pythia's *plain-kernel* option, not its damped default).

@@ -204,6 +204,18 @@ __host__ __device__ inline bool finalRegion(const SysLite& S,const End& pos,cons
   return !out.isEmpty;
 }
 
+// Split a colour-ordered chain into independent strings at every g->qqbar boundary: a break sits
+// between i and i+1 iff a real antiquark (id<0) is immediately followed by a real quark (id>0,!=21).
+// A pure q...gluons...qbar chain has no such boundary -> returns exactly one string [0..n-1]
+// (fully backward compatible). Each string is a maximal run [start..end] (q at start, qbar at end).
+__host__ __device__ inline int findStrings(const int* id,int n,int* starts,int* ends){
+  int ns=0, st=0;
+  for(int i=0;i<n-1;++i)
+    if(id[i]<0 && id[i]!=-21 && id[i+1]>0 && id[i+1]!=21){ starts[ns]=st; ends[ns]=i; ns++; st=i+1; }
+  starts[ns]=st; ends[ns]=n-1; ns++;
+  return ns;
+}
+
 // Fragment one chain; returns nHadrons or -1 (caller refragments).
 #ifdef USE_BW
 #include "bw_inc.cuh"
@@ -213,7 +225,9 @@ __host__ __device__ inline bool finalRegion(const SysLite& S,const End& pos,cons
 #endif
 __host__ __device__ inline int tryFragmentMR(const double* P,const int* id,int n,uint64_t& ctr,double* H,int* hid,double* hm){
   SysLite S; sysLiteSetUp(S,P,id,n);
-  End pos={0,S.iMax,1.0,0.0,0.0,0.0,0.0, 1}, neg={S.iMax,0,0.0,1.0,0.0,0.0,0.0, -1};
+  // Endpoint flavours from the actual string ends (q at id[0], qbar at id[n-1]); a g->qqbar fork
+  // makes these s/c/b. Identical to the old hard-wired +-1 for the original d...dbar string.
+  End pos={0,S.iMax,1.0,0.0,0.0,0.0,0.0, id[0]}, neg={S.iMax,0,0.0,1.0,0.0,0.0,0.0, id[n-1]};
   double pRem[4]={0,0,0,0}; for(int i=0;i<n;++i) for(int k=0;k<4;++k) pRem[k]+=P[4*i+k];
   int nH=0;
   for(int step=0; step<MAXPART-2; ++step){
@@ -308,8 +322,27 @@ __global__ void kern(int N,uint64_t base,int* outN,int* outNc,double* outTot,dou
   outNp[e]=np;
   double H[MAXPART*4]; int hid[MAXPART]; double hm[MAXPART];
   uint64_t hctr=(base^0x5151ULL)+(uint64_t)e*0x100000001B3ULL;
+#ifdef GLUON_SPLIT
+  // g->qqbar forks the colour chain into independent sub-strings: hadronize each with its own RNG
+  // stream and concatenate. A non-forked event has ns==1 and uses hctr -> identical single-string
+  // path. (Whole-event drop if any sub-string fails to fragment -> the existing drop accounting.)
+  int starts[MAXP], ends[MAXP];
+  int ns=findStrings(idsh,np,starts,ends);
+  int nH=0; bool bad=false;
+  for(int s=0;s<ns;++s){
+    int a=starts[s], ssz=ends[s]-a+1;
+    uint64_t sctr=(ns==1)? hctr : (hctr ^ ((uint64_t)(s+1)*0x9E3779B97F4A7C15ULL));
+    double Hs[MAXPART*4]; int hids[MAXPART]; double hms[MAXPART];
+    int r=hadronizeMR(&Psh[4*a], &idsh[a], ssz, sctr, Hs,hids,hms);
+    if(r<0 || nH+r>MAXPART){ bad=true; break; }
+    for(int j=0;j<r;++j){ for(int k=0;k<4;++k) H[4*(nH+j)+k]=Hs[4*j+k]; hid[nH+j]=hids[j]; hm[nH+j]=hms[j]; }
+    nH+=r;
+  }
+  if(bad||nH<=0){ outN[e]=-1; return; }
+#else
   int nH=hadronizeMR(Psh,idsh,np, hctr, H,hid,hm);
   if(nH<0){ outN[e]=-1; return; }
+#endif
   double s0=0,s1=0,s2=0,s3=0,dm=0; int nc=0;
   for(int i=0;i<nH;++i){ s0+=H[4*i];s1+=H[4*i+1];s2+=H[4*i+2];s3+=H[4*i+3];
     double m2=H[4*i+3]*H[4*i+3]-H[4*i]*H[4*i]-H[4*i+1]*H[4*i+1]-H[4*i+2]*H[4*i+2];

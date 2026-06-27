@@ -49,12 +49,24 @@ Physics (vs Pythia's own `SimpleTimeShower`, identical setup — `thrust_pythia.
 - vs *default* Pythia (ME-corrections on) the spread is 23.8%; that gap **is** Pythia's
   ME corrections, a higher-order effect no LL shower carries (GAPS included).
 
-Honest residuals / scope: FSR-only, massless, q→qg & g→gg. The ~4% LL residual is g→qq̄
-(kept on in the Pythia reference because `TimeShower:nGluonToQuark=0` *hangs* Pythia
-8.317), the exact-Λ α_s normalisation, and MC statistics. ME corrections (LL→NLL) are
-the next step. An early far-tail (1−T>0.35) excess was traced to **the observable** (a
-4-seed thrust axis missing the true axis on rare multi-jet events), not the shower — it
-collapses when the axis is seeded from every particle.
+Honest residuals / scope: FSR-only, massless, q→qg & g→gg by default. ME corrections (LL→NLL)
+and g→qq̄ are now opt-in (`-DME_FIRST`, `-DGLUON_SPLIT`); the residual LL gap is the exact-Λ
+α_s normalisation and MC statistics. An early far-tail (1−T>0.35) excess was traced to **the
+observable** (a 4-seed thrust axis missing the true axis on rare multi-jet events), not the
+shower — it collapses when the axis is seeded from every particle.
+
+g→qq̄ splitting (`-DGLUON_SPLIT`, the secondary-quark channel; reference counter `thrust_pythia
+g2q1` counts status-51 quarks with a gluon mother /2):
+- flag **OFF** is byte-identical to the LL shower (N_gqq=**0** exactly, ⟨1−T⟩ 0.0690, 100% GPU≡CPU)
+  — the clean A/B isolation gate.
+- flag **ON** vs Pythia `weightGluonToQuark=1` (same plain DGLAP kernel), MEcorr off: secondary-pair
+  rate **N_gqq = 0.578 vs 0.566 (+2.2%)**, flavour-resolved uds +2.2%, **c +0.3%**, b +6.8%; thrust
+  non-regression (0.0702 vs 0.0700); 100% GPU≡CPU; reproducible. Pythia's *default* weight is option 4
+  (massive reshape + high-mass damping → 0.5233), a documented future (massive-recoil) path.
+- hadronization of the forked multi-string events (`hadronize_mr -DGLUON_SPLIT`, `findStrings` slices
+  the chain at each q̄-then-q boundary): **4-momentum conservation exact (1.43e-10)**, on-shell exact,
+  reproducible; mult 20.92 vs 21.01 (−0.4%, a gluon kink → quark string-break), drop 3.0% (< the 3.4%
+  single-string rate, since forks simplify the region geometry).
 
 ## Stage 4 — Lund string hadronization, in detail
 

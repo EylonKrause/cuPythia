@@ -54,6 +54,18 @@ region_test: region_test.cu region_inc.cuh ../common/rng.cuh
 hadronize_mr: hadronize_mr.cu region_inc.cuh zlund_inc.cuh shower_inc.cuh ../common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
 
+# Optional hadronization precision variants (compile flags; NOT in `make check`):
+#   USE_BW      = Breit-Wigner vector-meson masses
+#   GLUON_SPLIT = consume the forked multi-string events from g->qqbar (the shower also splits);
+#     findStrings slices the chain at each q->qqbar boundary -> independent strings, conservation
+#     exact (1.4e-10). A non-forked event is one string -> identical to the default hadronizer.
+hadronize_bw: hadronize.cu zlund_inc.cuh bw_inc.cuh ../common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -DUSE_BW -o $@ $<
+hadronize_mr_bw: hadronize_mr.cu region_inc.cuh zlund_inc.cuh shower_inc.cuh bw_inc.cuh ../common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -DUSE_BW -o $@ $<
+hadronize_mr_gsplit: hadronize_mr.cu region_inc.cuh zlund_inc.cuh shower_inc.cuh ../common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -DGLUON_SPLIT -o $@ $<
+
 lhe_writer: lhe_writer.cu ../common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
 
