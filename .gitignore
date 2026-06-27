@@ -58,6 +58,7 @@ cuPythia/pipeline/bridge_pythia
 cuPythia/pipeline/region_test
 cuPythia/pipeline/hadronize_mr
 cuPythia/pipeline/hadronize_bw
+cuPythia/pipeline/hadronize_mr_bw
 cuPythia/pipeline/hepmc3_writer
 cuPythia/pipeline/*.hepmc3
 cuPythia/pipeline/genpdf

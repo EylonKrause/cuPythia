@@ -205,7 +205,13 @@ __host__ __device__ inline bool finalRegion(const SysLite& S,const End& pos,cons
 }
 
 // Fragment one chain; returns nHadrons or -1 (caller refragments).
-__host__ __device__ inline int tryFragmentMR(const double* P,const int* id,int n,uint64_t& ctr,double* H,int* hid){
+#ifdef USE_BW
+#include "bw_inc.cuh"
+#define HADMASS_MR(pdg,ctr) sampleBWmass(pdg, mesonMassMR(pdg), ctr)   // Breit-Wigner vector masses
+#else
+#define HADMASS_MR(pdg,ctr) mesonMassMR(pdg)                            // pole masses (default)
+#endif
+__host__ __device__ inline int tryFragmentMR(const double* P,const int* id,int n,uint64_t& ctr,double* H,int* hid,double* hm){
   SysLite S; sysLiteSetUp(S,P,id,n);
   End pos={0,S.iMax,1.0,0.0,0.0,0.0,0.0, 1}, neg={S.iMax,0,0.0,1.0,0.0,0.0,0.0, -1};
   double pRem[4]={0,0,0,0}; for(int i=0;i<n;++i) for(int k=0;k<4;++k) pRem[k]+=P[4*i+k];
@@ -218,7 +224,7 @@ __host__ __device__ inline int tryFragmentMR(const double* P,const int* id,int n
       fNew=pickFlavMR(ctr);
       pdg=combineMesonMR(e.flav, fromPos?-fNew:fNew, ctr);
       pairPTMR(ctr,gx,gy);
-      if(pdg!=0){ mHad=mesonMassMR(pdg); pxNew=gx; pyNew=gy; pxHad=e.px+pxNew; pyHad=e.py+pyNew; }
+      if(pdg!=0){ mHad=HADMASS_MR(pdg,ctr); pxNew=gx; pyNew=gy; pxHad=e.px+pxNew; pyHad=e.py+pyNew; }
     }
     if(pdg==0) return -1;
     double mT2Had=mHad*mHad+pxHad*pxHad+pyHad*pyHad;
@@ -231,25 +237,25 @@ __host__ __device__ inline int tryFragmentMR(const double* P,const int* id,int n
     // hadrons are accepted -> conservation stays exact (finalTwo distributes the remainder).
     // Retry the hadron (fresh flavour+pT+z) before giving up — Pythia's fallback order is to
     // retry the hadron, refragmenting the whole string only as a last resort.
-    int iPN,iNN; double xPN,xNN,GN,had[4]; bool made=false;
+    int iPN,iNN; double xPN,xNN,GN,had[4],accMass=mHad; bool made=false;
     for(int ht=0; ht<24 && !made; ++ht){
       int rpdg=0,rfNew=0; double rmHad=mHad,rpxHad=pxHad,rpyHad=pyHad,rpxNew=pxNew,rpyNew=pyNew,rmT2=mT2Had,rgx,rgy;
       if(ht>0){ // redraw flavour+pT for retries (ht==0 reuses the already-drawn hadron)
         for(int tr=0; tr<20 && rpdg==0; ++tr){ rfNew=pickFlavMR(ctr);
           rpdg=combineMesonMR(e.flav, fromPos?-rfNew:rfNew, ctr); pairPTMR(ctr,rgx,rgy);
-          if(rpdg!=0){ rmHad=mesonMassMR(rpdg); rpxNew=rgx; rpyNew=rgy; rpxHad=e.px+rpxNew; rpyHad=e.py+rpyNew; } }
+          if(rpdg!=0){ rmHad=HADMASS_MR(rpdg,ctr); rpxNew=rgx; rpyNew=rgy; rpxHad=e.px+rpxNew; rpyHad=e.py+rpyNew; } }
         if(rpdg==0) continue; rmT2=rmHad*rmHad+rpxHad*rpxHad+rpyHad*rpyHad; pdg=rpdg; fNew=rfNew;
         mHad=rmHad; pxNew=rpxNew; pyNew=rpyNew;
       }
       double z=zLundSample(H_ALUND,H_BLUND*rmT2,1.0,ctr);
       if(kinHad(S,fromPos,e,z,rmT2,rmHad,rpxHad,rpyHad,rpxNew,rpyNew,iPN,iNN,xPN,xNN,GN,had)){
         double hm2=had[3]*had[3]-had[0]*had[0]-had[1]*had[1]-had[2]*had[2];
-        if(had[3]==had[3] && fabs(had[3])<1e6 && fabs(hm2-rmHad*rmHad)<1e-5*(1.0+rmHad*rmHad)) made=true;
+        if(had[3]==had[3] && fabs(had[3])<1e6 && fabs(hm2-rmHad*rmHad)<1e-5*(1.0+rmHad*rmHad)){ made=true; accMass=rmHad; }
       }
     }
     if(!made) return -1;
     if(nH>=MAXPART) return -1;
-    for(int k=0;k<4;++k){ H[4*nH+k]=had[k]; pRem[k]-=had[k]; } hid[nH]=pdg; nH++;
+    for(int k=0;k<4;++k){ H[4*nH+k]=had[k]; pRem[k]-=had[k]; } hid[nH]=pdg; hm[nH]=accMass; nH++;
     e.iPos=iPN; e.iNeg=iNN; e.xPos=xPN; e.xNeg=xNN; e.Gamma=GN; e.px=-pxNew; e.py=-pyNew; e.flav=fromPos?fNew:-fNew;
   }
   // finalTwo (port of :1640-1716). pT and wT2 are independent of the final flavour, so fix
@@ -268,7 +274,7 @@ __host__ __device__ inline int tryFragmentMR(const double* P,const int* id,int n
     for(int tr=0; tr<20 && (p1==0||p2==0); ++tr){ fNew=pickFlavMR(ctr);
       p1=combineMesonMR(pos.flav,-fNew,ctr); p2=combineMesonMR(fNew,neg.flav,ctr); }
     if(p1==0||p2==0) continue;
-    double mm1=mesonMassMR(p1), mm2=mesonMassMR(p2);
+    double mm1=HADMASS_MR(p1,ctr), mm2=HADMASS_MR(p2,ctr);
     double t1=mm1*mm1+pos_pxHad*pos_pxHad+pos_pyHad*pos_pyHad;
     double t2=mm2*mm2+negpxHad*negpxHad+negpyHad*negpyHad;
     if(sqrt(wT2)<sqrt(t1)+sqrt(t2)) continue;
@@ -286,12 +292,12 @@ __host__ __device__ inline int tryFragmentMR(const double* P,const int* id,int n
   double q1m2=h1[3]*h1[3]-h1[0]*h1[0]-h1[1]*h1[1]-h1[2]*h1[2];
   double q2m2=h2[3]*h2[3]-h2[0]*h2[0]-h2[1]*h2[1]-h2[2]*h2[2];
   if(h1[3]!=h1[3]||h2[3]!=h2[3]||fabs(q1m2-m1*m1)>1e-5*(1.0+m1*m1)||fabs(q2m2-m2*m2)>1e-5*(1.0+m2*m2)) return -1;
-  for(int k=0;k<4;++k)H[4*nH+k]=h1[k]; hid[nH]=pdg1; nH++;
-  for(int k=0;k<4;++k)H[4*nH+k]=h2[k]; hid[nH]=pdg2; nH++;
+  for(int k=0;k<4;++k)H[4*nH+k]=h1[k]; hid[nH]=pdg1; hm[nH]=m1; nH++;
+  for(int k=0;k<4;++k)H[4*nH+k]=h2[k]; hid[nH]=pdg2; hm[nH]=m2; nH++;
   return nH;
 }
-__host__ __device__ inline int hadronizeMR(const double* P,const int* id,int n,uint64_t ctr,double* H,int* hid){
-  for(int retry=0; retry<50; ++retry){ int r=tryFragmentMR(P,id,n,ctr,H,hid); if(r>0) return r; }
+__host__ __device__ inline int hadronizeMR(const double* P,const int* id,int n,uint64_t ctr,double* H,int* hid,double* hm){
+  for(int retry=0; retry<50; ++retry){ int r=tryFragmentMR(P,id,n,ctr,H,hid,hm); if(r>0) return r; }
   return -1;
 }
 
@@ -300,14 +306,14 @@ __global__ void kern(int N,uint64_t base,int* outN,int* outNc,double* outTot,dou
   double Psh[MAXP*4]; int idsh[MAXP];
   int np=showerEvent(Psh,idsh, base+(uint64_t)e*0x9E3779B97F4A7C15ULL);   // FSR shower chain
   outNp[e]=np;
-  double H[MAXPART*4]; int hid[MAXPART];
+  double H[MAXPART*4]; int hid[MAXPART]; double hm[MAXPART];
   uint64_t hctr=(base^0x5151ULL)+(uint64_t)e*0x100000001B3ULL;
-  int nH=hadronizeMR(Psh,idsh,np, hctr, H,hid);
+  int nH=hadronizeMR(Psh,idsh,np, hctr, H,hid,hm);
   if(nH<0){ outN[e]=-1; return; }
   double s0=0,s1=0,s2=0,s3=0,dm=0; int nc=0;
   for(int i=0;i<nH;++i){ s0+=H[4*i];s1+=H[4*i+1];s2+=H[4*i+2];s3+=H[4*i+3];
     double m2=H[4*i+3]*H[4*i+3]-H[4*i]*H[4*i]-H[4*i+1]*H[4*i+1]-H[4*i+2]*H[4*i+2];
-    double mt=mesonMassMR(hid[i]); dm=fmax(dm,fabs(m2-mt*mt)); if(isChargedMR(hid[i]))nc++; }
+    double mt=hm[i]; dm=fmax(dm,fabs(m2-mt*mt)); if(isChargedMR(hid[i]))nc++; }   // on-shell vs mass used
   outN[e]=nH; outNc[e]=nc; outTot[4*e]=s0;outTot[4*e+1]=s1;outTot[4*e+2]=s2;outTot[4*e+3]=s3; outDm[e]=dm;
 }
 

@@ -60,7 +60,8 @@ These are real precision advantages, but of *method* (reproducibility, statistic
    exact inverse-CDF, one RNG draw, on-shell check uses the *sampled* mass). On the straight-
    string hadronizer the ρ spectrum is correctly broadened: **mean 0.779 (pole 0.775), RMS
    0.132 ≈ Γ=0.149**, with 4-momentum conservation still exact (5.7e-14) and multiplicity
-   unchanged. Default (pole) build is unaffected. (Same drop-in applies to `hadronize_mr.cu`.)
+   unchanged. Applied to **both** hadronizers (straight-string and multi-region; the
+   multi-region also conserves exactly 4.95e-11 with BW). Default (pole) build is unaffected.
 5. **Real PDF — DONE & VALIDATED.** `genpdf.cc` fills the `pdf.cuh` log-x/log-Q² grid from
    Pythia 8.317's **real proton gluon PDF** (the default NNPDF set) and the device interpolator
    reproduces it to **3.24e-3** in the σ-support region (xf_g(0.01,100)=7.9801 vs 7.9796) —
