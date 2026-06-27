@@ -65,6 +65,15 @@ counter-based, so any single event is **O(1)-reproducible** on any node.
   — matching the LEP measurement ⟨n_ch⟩≈21** at the Z pole. (The all-GPU *kinked* hadronizer,
   i.e. multi-region strings, is the next research step; `hadronize.cu` is all-GPU for the
   straight q-q̄ string.)
+- [x] **stage 4b — `hadronize_mr.cu`**: the all-GPU **multi-region (gluon-kinked)** Lund
+  fragmentation that closes the bridge above — fragments the FSR shower's q-g-…-q̄ chains
+  entirely on the GPU by porting Pythia's `kinematicsHadron` (the (m²,Γ) coupled quadratic +
+  bidirectional region-crossing), `finalRegion` and multi-region `finalTwo` onto the validated
+  region table (store only the n−1 low regions; cross regions on demand). Validated on the
+  shower chains: **EXACT 4-momentum conservation 4.9e-11, on-shellness 2.5e-9, reproducible**,
+  multiplicity **20.91 vs Pythia 22.57** (no decays, ~7%). Documented limitation: **~6% of hard
+  configs refragment-fail and are dropped** (biases the mean a few % low); pole masses, no
+  decays/baryons. To our knowledge the first algorithmic (non-ML) GPU multi-region Lund port.
 
 Design grounded in a web-research pass on GPU-generator architecture
 (Pepper, madgraph4gpu, GPU showers, device PDFs) → see `../../ARCHITECTURE.md`.

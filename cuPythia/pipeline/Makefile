@@ -4,7 +4,7 @@ NVCC      ?= /usr/local/cuda/bin/nvcc
 ARCH      ?= sm_120
 NVCCFLAGS ?= -O3 -std=c++17 -arch=$(ARCH)
 
-STAGES = build_events reweight generate pdf_xsec pdf_lumi_fft shower_fsr zlund_test hadronize lhe_writer bridge region_test
+STAGES = build_events reweight generate pdf_xsec pdf_lumi_fft shower_fsr zlund_test hadronize lhe_writer bridge region_test hadronize_mr
 
 all: $(STAGES)
 
@@ -38,6 +38,9 @@ hadronize: hadronize.cu zlund_inc.cuh ../common/rng.cuh
 region_test: region_test.cu region_inc.cuh ../common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
 
+hadronize_mr: hadronize_mr.cu region_inc.cuh zlund_inc.cuh shower_inc.cuh ../common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -o $@ $<
+
 lhe_writer: lhe_writer.cu ../common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
 
@@ -54,6 +57,7 @@ check: all
 	./lhe_writer 10000 events.lhe
 	./bridge 5000 shower_partons.dat
 	./region_test
+	./hadronize_mr 20000
 
 clean:
 	rm -f $(STAGES)

@@ -16,9 +16,11 @@ int main(int argc,char**argv){
   FILE* f=fopen(path,"r"); if(!f){ printf("cannot open %s\n",path); return 1; }
   int N; double Ecm; if(fscanf(f,"%d %lf",&N,&Ecm)!=2){ printf("bad header\n"); return 1; }
 
+  bool noDecay=(argc>2 && std::string(argv[2])=="nodecay");
   Pythia pythia;
   pythia.readString("ProcessLevel:all = off");      // feed partons directly
-  pythia.readString("HadronLevel:Decay = on");      // full hadron-level final state
+  pythia.readString(noDecay ? "HadronLevel:Decay = off" : "HadronLevel:Decay = on");
+  pythia.readString("StringFlav:probQQtoQ = 0");    // no baryons (match the GPU multi-region slice)
   pythia.readString("Print:quiet = on");
   if(!pythia.init()){ printf("BRIDGE: FAIL (init)\n"); return 2; }
   Event& ev = pythia.event;

@@ -26,6 +26,9 @@ __host__ __device__ inline void regionSetUp(Region& R,const double* p1in,const d
   const double m2Join=R_MJOIN*R_MJOIN;
   double p1[4],p2[4]; for(int k=0;k<4;++k){p1[k]=p1in[k];p2[k]=p2in[k];}
   R.isSetUp=false; R.isEmpty=false;
+  // Zero the basis so an EMPTY region's pHad gives 0 (Pythia's default-constructed Vec4),
+  // not uninitialized garbage — essential for determinism in the multi-region stepping.
+  for(int k=0;k<4;++k){R.pPos[k]=0.0;R.pNeg[k]=0.0;R.eX[k]=0.0;R.eY[k]=0.0;} R.w2=0.0;
   if(isMassless){
     R.w2=2.0*v4dot(p1,p2);
     if(R.w2<m2Join){R.isSetUp=true;R.isEmpty=true;return;}
