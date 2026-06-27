@@ -10,7 +10,7 @@ CMW α_s, and is tuned to LEP/LHC data. cuPythia is a from-scratch GPU port with
 | aspect | Pythia 8 | cuPythia (this pipeline) |
 |---|---|---|
 | shower | NLL-ish, ME-corrected, g→qqbar, CMW α_s | **leading-log**, q→qg & g→gg (+ g→qqbar `-DGLUON_SPLIT`), 1-loop α_s (threshold-matched) |
-| hadronization | full Lund: BW masses, all multiplets, baryons, decays | pseudoscalar+vector, **pole masses**, uds, no baryons/decays |
+| hadronization | full Lund: BW masses, all multiplets, baryons, decays | pseudoscalar+vector, pole masses (+BW `-DUSE_BW`), uds, **no baryons** (+ hadron decays `-DDECAYS`) |
 | hard process | NLO/merged, LHAPDF | LO gg→gg, toy PDF (real LHAPDF drops in) |
 | tuning | decades of data tunes | untuned (Pythia defaults) |
 
@@ -103,13 +103,26 @@ These are real precision advantages, but of *method* (reproducibility, statistic
    and an LL shower has no NLL terms to compensate. So 2-loop α_s is *correctly implemented* but
    *physically inappropriate at LL* — it concretely demonstrates **why showers use 1-loop(+CMW)**.
    Kept opt-in and off by default.
-7. **NLO matching** (POWHEG/MC@NLO) — the genuine remaining frontier (a research program, not a
+7. **Hadron decays — DONE & VALIDATED** (`-DDECAYS`, `decay_inc.cuh`; validator `decay_test.cu` in
+   `make check`). The real-ALEPH-data (Rivet) comparison identified hadron decays as the **#1 gap**;
+   this closes most of it. GPU recursive decays of the primary unstable mesons (ρ/K*/ω/φ/η/η'/K⁰ →
+   π/K/γ/K_S/K_L) into the ALEPH particle-level stable set: a baked decay table (BRs from Pythia
+   8.317, renormalized), isotropic **2-body** + flat-Dalitz **3-body** kinematics, a recursion-free
+   LIFO stack, a **fixed counter-RNG draw budget** (host≡CPU bit-identical) on a **separate stream**
+   so the no-decay build stays byte-identical. **Validated:** per-decay 4-momentum closure **1.07e-14**,
+   on-shell 1.45e-14, GPU≡CPU 100%, reproducible; in the pipeline charged multiplicity **11.3 → 18.69**
+   (vs ALEPH 20.73, −9.8%) and the ALEPH **thrust χ²/ndf 39 → 10.3** (3.8× better), conservation still
+   exact (1.23e-10). **Honest caveat:** the −9.8% residual is the floor from the *other* omissions
+   (no baryons ~5–6%, heavy flavour only via g→qqbar, flat Dalitz, untuned Lund, no detector); π⁰/K_S
+   kept stable per the Rivet particle-level convention. v1 = light-unstable-meson 2-/3-body flat phase
+   space; D/B left stable.
+8. **NLO matching** (POWHEG/MC@NLO) — the genuine remaining frontier (a research program, not a
    flag): it requires the NLO virtual+real subtraction and a matching scheme, beyond this LL/LO
    port. Documented honestly as out of scope rather than approximated. (The first-emission ME
    correction, item 1, already supplies the O(α_s) real ME for the hardest emission.)
 
-Items 1–6 are DONE & VALIDATED (all opt-in via `-D` flags so the committed LL/LO results stay
-byte-stable); item 7 (NLO matching) is the genuine remaining frontier, documented honestly rather
+Items 1–7 are DONE & VALIDATED (all opt-in via `-D` flags so the committed LL/LO results stay
+byte-stable); item 8 (NLO matching) is the genuine remaining frontier, documented honestly rather
 than approximated. The g→qqbar addition (item 3) was the last *correctness* gap (flavour/string
 topology), not just a precision knob — it took a dedicated research+design pass to get the sharing,
 masses and colour-fork right. Item 6 (2-loop α_s) is an honest *negative* result: implemented

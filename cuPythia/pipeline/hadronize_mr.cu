@@ -25,6 +25,12 @@
 #include "region_inc.cuh"
 #include "zlund_inc.cuh"
 #include "shower_inc.cuh"     // showerEvent: produces the q-g-...-qbar chain (MZ, EBEAM)
+#ifdef DECAYS
+#include "decay_inc.cuh"      // GPU recursive hadron decays (rho/K*/omega/phi/eta/eta'/K0 -> pi/K/gamma)
+#define OUTCAP MAXFINAL       // decays multiply particle count -> larger output buffer cap
+#else
+#define OUTCAP MAXPART
+#endif
 
 #define CK(c) do{cudaError_t e=(c); if(e!=cudaSuccess){printf("CUDA %s @%d\n",cudaGetErrorString(e),__LINE__);return 1;}}while(0)
 
@@ -39,7 +45,7 @@ static const double EQ_TINY=1e-6, PT2SAME=0.01;   // StringEnd::TINY, PT2SAME
 __host__ __device__ inline double mesonMassMR(int pdg){
   switch(abs(pdg)){
     case 211:return 0.13957; case 111:return 0.13498; case 221:return 0.54786; case 331:return 0.95778;
-    case 321:return 0.49368; case 311:return 0.49761;
+    case 321:return 0.49368; case 311:return 0.49761; case 130: case 310:return 0.49761; case 22:return 0.0;
     case 213:return 0.77526; case 113:return 0.77526; case 223:return 0.78266; case 333:return 1.01946;
     case 323:return 0.89167; case 313:return 0.89555;
   } return -1.0;
@@ -344,22 +350,44 @@ __global__ void kern(int N,uint64_t base,int* outN,int* outNc,double* outTot,dou
   int nH=hadronizeMR(Psh,idsh,np, hctr, H,hid,hm);
   if(nH<0){ outN[e]=-1; return; }
 #endif
+#ifdef DECAYS
+  // Decay the primary unstable hadrons (rho/K*/omega/phi/eta/eta'/K0) into the ALEPH particle-level
+  // stable set. SEPARATE counter stream dctr (NOT hctr) so toggling -DDECAYS cannot perturb the
+  // hadronization draws -> the no-decay build stays byte-identical.
+  double F[MAXFINAL*4]; int fid[MAXFINAL];
+  uint64_t dctr=(base^0xDECAULL)+(uint64_t)e*0x100000001B3ULL;
+  int nF=decayEvent(H,hid,nH,dctr,F,fid);
+  if(nF<0){ outN[e]=-1; return; }
+  double* OUTP=F; int* OUTID=fid; int OUTN=nF;
+#else
+  double* OUTP=H; int* OUTID=hid; int OUTN=nH;
+#endif
   double s0=0,s1=0,s2=0,s3=0,dm=0; int nc=0;
-  for(int i=0;i<nH;++i){ s0+=H[4*i];s1+=H[4*i+1];s2+=H[4*i+2];s3+=H[4*i+3];
-    double m2=H[4*i+3]*H[4*i+3]-H[4*i]*H[4*i]-H[4*i+1]*H[4*i+1]-H[4*i+2]*H[4*i+2];
-    double mt=hm[i]; dm=fmax(dm,fabs(m2-mt*mt)); if(isChargedMR(hid[i]))nc++; }   // on-shell vs mass used
-  outN[e]=nH; outNc[e]=nc; outTot[4*e]=s0;outTot[4*e+1]=s1;outTot[4*e+2]=s2;outTot[4*e+3]=s3; outDm[e]=dm;
+  for(int i=0;i<OUTN;++i){ s0+=OUTP[4*i];s1+=OUTP[4*i+1];s2+=OUTP[4*i+2];s3+=OUTP[4*i+3];
+    double m2=OUTP[4*i+3]*OUTP[4*i+3]-OUTP[4*i]*OUTP[4*i]-OUTP[4*i+1]*OUTP[4*i+1]-OUTP[4*i+2]*OUTP[4*i+2];
+#ifdef DECAYS
+    double mt=mesonMassMR(OUTID[i]);     // finals are stable -> pole mass (matches decay product mass)
+#else
+    double mt=hm[i];                     // primary hadron's BW-sampled mass
+#endif
+    dm=fmax(dm,fabs(m2-mt*mt)); if(isChargedMR(OUTID[i]))nc++; }
+  outN[e]=OUTN; outNc[e]=nc; outTot[4*e]=s0;outTot[4*e+1]=s1;outTot[4*e+2]=s2;outTot[4*e+3]=s3; outDm[e]=dm;
   // Optional per-event hadron record (for the HepMC3/Rivet dump; ignored unless main writes it).
-  for(int i=0;i<nH;++i){ for(int k=0;k<4;++k) outH[((size_t)e*MAXPART+i)*4+k]=H[4*i+k]; outHid[(size_t)e*MAXPART+i]=hid[i]; }
+  for(int i=0;i<OUTN;++i){ for(int k=0;k<4;++k) outH[((size_t)e*OUTCAP+i)*4+k]=OUTP[4*i+k]; outHid[(size_t)e*OUTCAP+i]=OUTID[i]; }
 }
 
 int main(int argc,char**argv){
   int N=(argc>1)?atoi(argv[1]):20000; uint64_t base=0x4D52ULL;
-  int TPB=128, blocks=(N+TPB-1)/TPB;
+#ifdef DECAYS
+  int TPB=64;    // larger per-thread F[]/S[] under decays -> use fewer threads/block to fit
+#else
+  int TPB=128;
+#endif
+  int blocks=(N+TPB-1)/TPB;
   const char* dumpFile=(argc>2)?argv[2]:nullptr;   // optional: write per-event hadrons for HepMC3/Rivet
   int *dN,*dNc,*dNp,*dHid; double *dTot,*dDm,*dH;
   CK(cudaMalloc(&dN,(size_t)N*4));CK(cudaMalloc(&dNc,(size_t)N*4));CK(cudaMalloc(&dNp,(size_t)N*4));CK(cudaMalloc(&dTot,(size_t)N*32));CK(cudaMalloc(&dDm,(size_t)N*8));
-  CK(cudaMalloc(&dH,(size_t)N*MAXPART*4*8));CK(cudaMalloc(&dHid,(size_t)N*MAXPART*4));
+  CK(cudaMalloc(&dH,(size_t)N*OUTCAP*4*8));CK(cudaMalloc(&dHid,(size_t)N*OUTCAP*4));
   kern<<<blocks,TPB>>>(N,base,dN,dNc,dTot,dDm,dNp,dH,dHid); CK(cudaDeviceSynchronize());
   std::vector<int> hN(N),hNc(N),hNp(N); std::vector<double> hTot((size_t)N*4),hDm(N);
   CK(cudaMemcpy(hN.data(),dN,(size_t)N*4,cudaMemcpyDeviceToHost));
@@ -368,17 +396,17 @@ int main(int argc,char**argv){
   CK(cudaMemcpy(hTot.data(),dTot,(size_t)N*32,cudaMemcpyDeviceToHost));
   CK(cudaMemcpy(hDm.data(),dDm,(size_t)N*8,cudaMemcpyDeviceToHost));
   std::vector<double> hH; std::vector<int> hHid;
-  if(dumpFile){ hH.resize((size_t)N*MAXPART*4); hHid.resize((size_t)N*MAXPART);
-    CK(cudaMemcpy(hH.data(),dH,(size_t)N*MAXPART*4*8,cudaMemcpyDeviceToHost));
-    CK(cudaMemcpy(hHid.data(),dHid,(size_t)N*MAXPART*4,cudaMemcpyDeviceToHost)); }
+  if(dumpFile){ hH.resize((size_t)N*OUTCAP*4); hHid.resize((size_t)N*OUTCAP);
+    CK(cudaMemcpy(hH.data(),dH,(size_t)N*OUTCAP*4*8,cudaMemcpyDeviceToHost));
+    CK(cudaMemcpy(hHid.data(),dHid,(size_t)N*OUTCAP*4,cudaMemcpyDeviceToHost)); }
   std::vector<int> hN2(N); kern<<<blocks,TPB>>>(N,base,dN,dNc,dTot,dDm,dNp,dH,dHid); CK(cudaDeviceSynchronize());
   CK(cudaMemcpy(hN2.data(),dN,(size_t)N*4,cudaMemcpyDeviceToHost));
   if(dumpFile){ FILE* fo=fopen(dumpFile,"w");
     if(fo){ long nValid=0; for(int e=0;e<N;++e) if(hN[e]>0) nValid++;
       fprintf(fo,"%ld %.6f\n",nValid,MZ);
       for(int e=0;e<N;++e){ if(hN[e]<=0) continue; fprintf(fo,"%d\n",hN[e]);
-        for(int i=0;i<hN[e];++i){ size_t b=((size_t)e*MAXPART+i)*4;
-          fprintf(fo,"%d 0 0 %.9e %.9e %.9e %.9e\n",hHid[(size_t)e*MAXPART+i],hH[b],hH[b+1],hH[b+2],hH[b+3]); } }
+        for(int i=0;i<hN[e];++i){ size_t b=((size_t)e*OUTCAP+i)*4;
+          fprintf(fo,"%d 0 0 %.9e %.9e %.9e %.9e\n",hHid[(size_t)e*OUTCAP+i],hH[b],hH[b+1],hH[b+2],hH[b+3]); } }
       fclose(fo); printf("  dumped %ld hadron-level events -> %s\n",nValid,dumpFile); } }
 
   double maxMom=0,maxDm=0; long sumN=0,sumNc=0,nFail=0,repro=0;
@@ -393,7 +421,12 @@ int main(int argc,char**argv){
   (void)nN2;(void)nBadN2;(void)nBadN3plus;(void)npOkMax;(void)npBadMin;
   long nok=N-nFail;
   printf("All-GPU multi-region (gluon-kinked) hadronization: FSR shower -> hadrons (sqrt(s)=%.3f, %d evts)\n",MZ,N);
-  printf("  multiplicity      : mean %.3f hadrons, %.3f charged (no decays)\n",(double)sumN/(nok?nok:1),(double)sumNc/(nok?nok:1));
+#ifdef DECAYS
+  const char* dlbl="(decays on)";
+#else
+  const char* dlbl="(no decays)";
+#endif
+  printf("  multiplicity      : mean %.3f hadrons, %.3f charged %s\n",(double)sumN/(nok?nok:1),(double)sumNc/(nok?nok:1),dlbl);
   printf("  4-mom conservation: max|deviation| = %.2e GeV\n",maxMom);
   printf("  on-shellness      : max|m^2-table| = %.2e GeV^2\n",maxDm);
   printf("  refragment-drop   : %ld / %d = %.1f%% (hard configs dropped — biases mult ~few%% low)\n",nFail,N,100.0*nFail/N);

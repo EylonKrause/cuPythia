@@ -4,7 +4,7 @@ NVCC      ?= /usr/local/cuda/bin/nvcc
 ARCH      ?= sm_120
 NVCCFLAGS ?= -O3 -std=c++17 -arch=$(ARCH)
 
-STAGES = build_events reweight generate pdf_xsec pdf_lumi_fft shower_fsr zlund_test hadronize lhe_writer bridge region_test hadronize_mr
+STAGES = build_events reweight generate pdf_xsec pdf_lumi_fft shower_fsr zlund_test hadronize lhe_writer bridge region_test hadronize_mr decay_test
 
 all: $(STAGES)
 
@@ -62,6 +62,9 @@ region_test: region_test.cu region_inc.cuh ../common/rng.cuh
 hadronize_mr: hadronize_mr.cu region_inc.cuh zlund_inc.cuh shower_inc.cuh ../common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
 
+decay_test: decay_test.cu decay_inc.cuh bw_inc.cuh shower_inc.cuh ../common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -o $@ $<
+
 # Optional hadronization precision variants (compile flags; NOT in `make check`):
 #   USE_BW      = Breit-Wigner vector-meson masses
 #   GLUON_SPLIT = consume the forked multi-string events from g->qqbar (the shower also splits);
@@ -73,6 +76,11 @@ hadronize_mr_bw: hadronize_mr.cu region_inc.cuh zlund_inc.cuh shower_inc.cuh bw_
 	$(NVCC) $(NVCCFLAGS) -DUSE_BW -o $@ $<
 hadronize_mr_gsplit: hadronize_mr.cu region_inc.cuh zlund_inc.cuh shower_inc.cuh ../common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -DGLUON_SPLIT -o $@ $<
+# DECAYS = decay the primary unstable hadrons (rho/K*/omega/phi/eta/eta'/K0 -> pi/K) into the ALEPH
+# particle-level stable set. Best-physics build (ME+g->qqbar+decays): charged mult 11.3 -> 18.7 (vs
+# ALEPH 20.73), thrust chi2/ndf vs ALEPH 39 -> 10.3. decay_inc.cuh; validated by decay_test (in check).
+hadronize_mr_decay: hadronize_mr.cu region_inc.cuh zlund_inc.cuh shower_inc.cuh decay_inc.cuh bw_inc.cuh ../common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -DME_FIRST -DGLUON_SPLIT -DDECAYS -o $@ $<
 
 lhe_writer: lhe_writer.cu ../common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
@@ -91,6 +99,7 @@ check: all
 	./bridge 5000 shower_partons.dat
 	./region_test
 	./hadronize_mr 20000
+	./decay_test 500000
 
 # Optional real-PDF tool — fills the device PDF grid from Pythia's real gluon PDF and
 # validates the interpolator vs it (needs Pythia + PYTHIA8DATA; not in `make check`).
