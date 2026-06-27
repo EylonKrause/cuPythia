@@ -122,6 +122,9 @@ __host__ __device__ inline int showerEvent(double* P,int* id,uint64_t ctr){
 #endif
   for(int step=0; step<MAXP; ++step){
     double bestT=PT2MIN, bestZ=0; int bRad=-1,bRec=-1;
+#ifdef GLUON_SPLIT
+    bool bSplit=false; int bFlav=0;     // g->qqbar: chosen channel + quark flavour of the best trial
+#endif
     for(int i=0;i<n;++i){
       for(int side=0;side<2;++side){
         int rec; bool valid;
@@ -134,20 +137,61 @@ __host__ __device__ inline int showerEvent(double* P,int* id,uint64_t ctr){
         if(zc>0.499) continue; double zmaxc=1.0-zc;
         double amax=alphaS(PT2MIN);
         double Iover=(amax/(2.0*M_PI))*colFac*2.0*log(zmaxc/zc); if(Iover<=0) continue;
+#ifdef GLUON_SPLIT
+        // g->qqbar trial channel (gluon radiators only): flat-z, kernel T_R[z^2+(1-z)^2], T_R=1/2.
+        // nfTrial=5 (the MAX) so the flat overestimate bounds the active-flavour sum at every scale.
+        // A gluon sits in TWO dipoles and each end generates the trial; unlike g->gg (genuine
+        // coherent radiation off each colour line) the g->qqbar CONVERSION of the whole gluon must
+        // be SHARED 1/2 per end or it double counts -> coefficient T_R*(1/2)=0.5*0.5=0.25. (Verified:
+        // without the 1/2, N_gqq came out 2.14x the Pythia reference.) Adding IoverSplit only shrinks
+        // the trial step; the veto stays EXACT for g->gg (unbiased).
+        double IoverSplit=(!isQ)?(amax/(2.0*M_PI))*0.25*5.0*(zmaxc-zc):0.0;
+        Iover+=IoverSplit;
+#endif
         double t=pT2;
         for(int it=0; it<20000; ++it){
           double R1=u01(splitmix64(ctr++)); t*=pow(R1,1.0/Iover);
           if(t<PT2MIN) break;
+#ifdef GLUON_SPLIT
+          // FIXED 5 draws/iteration for EVERY dipole end (gluon or quark): Rc,Rf are drawn even for
+          // quark radiators (where they go unused) so the per-thread RNG phase never depends on
+          // parton flavour -> control flow stays 100% GPU==CPU. (Off: 3 draws, byte-identical.)
+          double Rc=u01(splitmix64(ctr++));                              // channel pick
+          double Rf=u01(splitmix64(ctr++));                             // flavour pick
+          double R2=u01(splitmix64(ctr++));
+          bool doSplit=(!isQ)&&(Rc*Iover<IoverSplit);
+          double zz=doSplit ? (zc+(zmaxc-zc)*R2)                        // flat-z (kernel is pole-free)
+                            : (1.0-(1.0-zc)*pow(zc/(1.0-zc),R2));       // log-z (emit, unchanged)
+#else
           double R2=u01(splitmix64(ctr++));
           double zz=1.0-(1.0-zc)*pow(zc/(1.0-zc),R2);
+#endif
           double R3=u01(splitmix64(ctr++));
           double zmn=0.5-sqrt(fmax(0.0,0.25-t/m2Dip)), zmx=1.0-zmn;
           double m2v=t/(zz*(1.0-zz));
           if(zz>zmn && zz<zmx && m2v<m2Dip){
             double dal=zz*(1.0-zz)*(m2Dip+m2v)*(m2Dip+m2v);
             if(m2v*m2Dip<dal){
+#ifdef GLUON_SPLIT
+              double w; int flav=0;
+              if(doSplit){
+                flav=1+(int)(5.0*Rf); if(flav>5)flav=5;                // uniform flavour {1..nGluonToQuark=5}
+                // Pythia quark m0: u,d=0.33, s=0.50, c=1.50, b=4.80 (ParticleData.xml). The pair
+                // threshold m2_qq >= THRESHM2*m_q^2 (4.004) and betaQ both suppress low-mass pairs;
+                // treating u,d as massless overproduced uds ~9% -> use m0 like Pythia. No nf-count
+                // veto (alphaS() handles the running nf separately); the kinematic threshold IS the gate.
+                double mq=(flav==5)?4.8:((flav==4)?1.5:((flav==3)?0.5:0.33));
+                if(m2v>=4.004*mq*mq){                                  // = Pythia THRESHM2 pair threshold
+                  double beta=sqrt(fmax(0.0,1.0-4.0*mq*mq/m2v));       // = Pythia betaQ
+                  w=beta*(zz*zz+(1.0-zz)*(1.0-zz));                    // NO T_R (already in IoverSplit)
+                } else w=-1.0;                                         // below pair threshold -> veto
+              } else w=isQ?0.5*(1.0+zz*zz):0.5*(1.0+zz*zz*zz);
+              if(w>0.0 && R3<(alphaS(t)/amax)*w){
+                if(t>bestT){ bestT=t; bestZ=zz; bRad=i; bRec=rec; bSplit=doSplit; bFlav=flav; } break; }
+#else
               double w=isQ?0.5*(1.0+zz*zz):0.5*(1.0+zz*zz*zz);
               if(R3<(alphaS(t)/amax)*w){ if(t>bestT){ bestT=t; bestZ=zz; bRad=i; bRec=rec; } break; }
+#endif
             }
           }
         }
@@ -161,10 +205,22 @@ __host__ __device__ inline int showerEvent(double* P,int* id,uint64_t ctr){
     if(n>=MAXP) break;
     if(bRec==bRad+1){
       for(int k=n;k>bRad+1;--k){ cp4(P+4*k,P+4*(k-1)); id[k]=id[k-1]; }
-      cp4(P+4*bRad,oR); cp4(P+4*(bRad+1),oE); id[bRad+1]=21; cp4(P+4*(bRad+2),oC);
+      cp4(P+4*bRad,oR); cp4(P+4*(bRad+1),oE); cp4(P+4*(bRad+2),oC);
+#ifdef GLUON_SPLIT
+      if(bSplit){ id[bRad]=-bFlav; id[bRad+1]=bFlav; }  // qbar' (connects left), q' (connects right)
+      else id[bRad+1]=21;
+#else
+      id[bRad+1]=21;
+#endif
     } else {
       for(int k=n;k>bRad;--k){ cp4(P+4*k,P+4*(k-1)); id[k]=id[k-1]; }
-      cp4(P+4*(bRad-1),oC); cp4(P+4*bRad,oE); id[bRad]=21; cp4(P+4*(bRad+1),oR);
+      cp4(P+4*(bRad-1),oC); cp4(P+4*bRad,oE); cp4(P+4*(bRad+1),oR);
+#ifdef GLUON_SPLIT
+      if(bSplit){ id[bRad]=-bFlav; id[bRad+1]=bFlav; }  // qbar' (connects left), q' (connects right)
+      else id[bRad]=21;
+#else
+      id[bRad]=21;
+#endif
     }
     n++;
   }

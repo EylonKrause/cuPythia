@@ -20,8 +20,8 @@ using namespace Pythia8;
 
 int main(int argc,char**argv){
   int nEvt=(argc>1)?atoi(argv[1]):200000;
-  bool mecOff=false, cmw=false;
-  for(int a=2;a<argc;++a){ std::string s(argv[a]); if(s=="mecoff")mecOff=true; if(s=="cmw")cmw=true; }
+  bool mecOff=false, cmw=false, g2q1=false;
+  for(int a=2;a<argc;++a){ std::string s(argv[a]); if(s=="mecoff")mecOff=true; if(s=="cmw")cmw=true; if(s=="g2q1")g2q1=true; }
   Pythia pythia;
   pythia.readString("Beams:idA = -11");                  // e+   (matches Pythia example main111)
   pythia.readString("Beams:idB = 11");                   // e-
@@ -36,13 +36,26 @@ int main(int argc,char**argv){
   pythia.readString("TimeShower:pTmin = 0.5");            // match the GPU shower cutoff
   if(mecOff) pythia.readString("TimeShower:MEcorrections = off"); // LL shower, like the GPU shower
   if(cmw)    pythia.readString("TimeShower:alphaSuseCMW = on");   // soft-coherence NLL rescaling
+  // weightGluonToQuark: Pythia DEFAULT is 4 (zCosThe massive-recoil reshape + pow3(1-m2/m2dip)
+  // high-mass damping). The GPU shower is massless and uses the PLAIN DGLAP kernel betaQ(z^2+(1-z)^2)
+  // = Pythia option 1; g2q1 sets the reference to option 1 for an apples-to-apples kernel comparison.
+  if(g2q1)   pythia.readString("TimeShower:weightGluonToQuark = 1");
   pythia.readString("Print:quiet = on");
   pythia.readString("Next:numberCount = 0");
   if(!pythia.init()){ printf("Pythia init failed\n"); return 1; }
 
   const int NB=20; const double TMAX=0.5; long hist[NB]={0}; long nAcc=0; double sum1mT=0;
+  // g->qqbar reference counter (no physics toggle changed): a final-state g->qqbar branching is
+  // the unique FSR vertex whose TWO status-51 daughters are quarks (|id|<=5) with a GLUON mother.
+  // Count them and divide by 2 = secondary qqbar pairs/event. (q->qg / g->gg daughters never match:
+  // q->qg daughters have a quark mother; g->gg daughters are gluons.) Split by |id| into uds/c/b.
+  long nGen=0, nGQQ_uds=0, nGQQ_c=0, nGQQ_b=0;
   Thrust thr(2);                                          // select=2: all final particles
-  for(int e=0;e<nEvt;++e){ if(!pythia.next()) continue;
+  for(int e=0;e<nEvt;++e){ if(!pythia.next()) continue; nGen++;
+    for(int i=0;i<pythia.event.size();++i){ const Particle& p=pythia.event[i];
+      if(p.statusAbs()!=51) continue; int ai=p.idAbs(); if(ai<1||ai>5) continue;
+      int mom=p.mother1(); if(mom<=0) continue; if(pythia.event[mom].idAbs()!=21) continue;
+      if(ai==5) nGQQ_b++; else if(ai==4) nGQQ_c++; else nGQQ_uds++; }
     if(!thr.analyze(pythia.event)) continue;
     double omt=1.0-thr.thrust(); sum1mT+=omt; nAcc++;
     int b=(int)(omt/TMAX*NB); if(b<0)b=0; if(b>=NB)b=NB-1; hist[b]++; }
@@ -56,5 +69,19 @@ int main(int argc,char**argv){
     fclose(f); }
   printf("Pythia 8.317 FSR reference (MEcorr=%s): %ld events, <1-T> = %.4f  -> %s\n",
          mecOff?"off":"on", nAcc, sum1mT/nAcc, fn);
+
+  // g->qqbar rate (secondary qqbar pairs per generated event), total + flavour breakdown.
+  double Dgen=(double)nGen;
+  double pUds=0.5*nGQQ_uds/Dgen, pC=0.5*nGQQ_c/Dgen, pB=0.5*nGQQ_b/Dgen, pTot=pUds+pC+pB;
+  const char* fg = g2q1 ? (mecOff?"Ngqq_pythia_mecoff_g2q1.dat":"Ngqq_pythia_g2q1.dat")
+                        : (mecOff?"Ngqq_pythia_mecoff.dat":"Ngqq_pythia.dat");
+  FILE* g=fopen(fg,"w");
+  if(g){ fprintf(g,"# N_gqq pairs/event [Pythia 8.317 FSR, MEcorr=%s, weightG2Q=%s, %ld gen evts]\n",
+            mecOff?"off":"on", g2q1?"1(plain)":"4(default)", nGen);
+    fprintf(g,"# total  uds  c  b\n%.6f %.6f %.6f %.6f\n",pTot,pUds,pC,pB); fclose(g); }
+  // Poisson MC error on the per-event mean ~ sqrt(pairs)/nGen (pairs = 0.5*count):
+  double sePairs=sqrt(0.5*(nGQQ_uds+nGQQ_c+nGQQ_b))/Dgen;
+  printf("g->qqbar: N_gqq = %.4f +- %.4f pairs/evt (uds %.4f, c %.4f, b %.4f) [weightG2Q=%s] -> %s\n",
+         pTot, sePairs, pUds, pC, pB, g2q1?"1":"4", fg);
   return 0;
 }

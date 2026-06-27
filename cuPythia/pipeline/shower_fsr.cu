@@ -53,7 +53,7 @@ __host__ __device__ inline double thrust(const double* P,int n){
   return Tbest;
 }
 
-__global__ void showerKernel(int nEvt,uint64_t base,int* outN,double* outTot,double* outM2,double* outThr){
+__global__ void showerKernel(int nEvt,uint64_t base,int* outN,double* outTot,double* outM2,double* outThr,int* outGqq){
   int e=blockIdx.x*(int)blockDim.x+threadIdx.x; if(e>=nEvt) return;
   double P[MAXP*4]; int id[MAXP];
   int n=showerEvent(P,id, base + (uint64_t)e*0x9E3779B97F4A7C15ULL);
@@ -63,6 +63,13 @@ __global__ void showerKernel(int nEvt,uint64_t base,int* outN,double* outTot,dou
     mm=fmax(mm,fabs(m2)); }
   outN[e]=n; outTot[4*e]=s0;outTot[4*e+1]=s1;outTot[4*e+2]=s2;outTot[4*e+3]=s3; outM2[e]=mm;
   outThr[e]=thrust(P,n);
+  // Secondary g->qqbar pairs: each split leaves exactly ONE persistent colour-ordered boundary
+  // "real antiquark (id<0) immediately followed by real quark (id>0, !=21)". Count & pack flavour
+  // (uds + 1000*c + 1000000*b). Zero for the flag-off build (no g->qqbar) -> the A/B isolation gate.
+  int gU=0,gC=0,gB=0;
+  for(int i=0;i<n-1;++i){ if(id[i]<0 && id[i+1]>0 && id[i+1]!=21){
+    int af=id[i+1]; if(af==5)gB++; else if(af==4)gC++; else gU++; } }
+  outGqq[e]=gU + 1000*gC + 1000000*gB;
 }
 
 int main(int argc,char**argv){
@@ -70,13 +77,14 @@ int main(int argc,char**argv){
   int TPB=128, blocks=(nEvt+TPB-1)/TPB;        // GAPS-optimal 128 threads/block
   uint64_t base=0x5110UL;
 
-  int *dN; double *dTot,*dM2,*dThr;
+  int *dN; double *dTot,*dM2,*dThr; int *dGqq;
   CK(cudaMalloc(&dN,(size_t)nEvt*4)); CK(cudaMalloc(&dTot,(size_t)nEvt*32));
   CK(cudaMalloc(&dM2,(size_t)nEvt*8)); CK(cudaMalloc(&dThr,(size_t)nEvt*8));
+  CK(cudaMalloc(&dGqq,(size_t)nEvt*4));
 
   cudaEvent_t t0,t1; CK(cudaEventCreate(&t0)); CK(cudaEventCreate(&t1));
   CK(cudaEventRecord(t0));
-  showerKernel<<<blocks,TPB>>>(nEvt,base,dN,dTot,dM2,dThr);
+  showerKernel<<<blocks,TPB>>>(nEvt,base,dN,dTot,dM2,dThr,dGqq);
   CK(cudaEventRecord(t1)); CK(cudaEventSynchronize(t1));
   float ms=0; CK(cudaEventElapsedTime(&ms,t0,t1));
 
@@ -85,10 +93,11 @@ int main(int argc,char**argv){
   CK(cudaMemcpy(hTot.data(),dTot,(size_t)nEvt*32,cudaMemcpyDeviceToHost));
   CK(cudaMemcpy(hM2.data(),dM2,(size_t)nEvt*8,cudaMemcpyDeviceToHost));
   CK(cudaMemcpy(hThr.data(),dThr,(size_t)nEvt*8,cudaMemcpyDeviceToHost));
+  std::vector<int> hGqq(nEvt); CK(cudaMemcpy(hGqq.data(),dGqq,(size_t)nEvt*4,cudaMemcpyDeviceToHost));
 
   // (1) reproducibility: a second identical launch must be bit-identical.
   std::vector<int> hN2(nEvt); std::vector<double> hTot2((size_t)nEvt*4);
-  showerKernel<<<blocks,TPB>>>(nEvt,base,dN,dTot,dM2,dThr); CK(cudaDeviceSynchronize());
+  showerKernel<<<blocks,TPB>>>(nEvt,base,dN,dTot,dM2,dThr,dGqq); CK(cudaDeviceSynchronize());
   CK(cudaMemcpy(hN2.data(),dN,(size_t)nEvt*4,cudaMemcpyDeviceToHost));
   CK(cudaMemcpy(hTot2.data(),dTot,(size_t)nEvt*32,cudaMemcpyDeviceToHost));
   long reproDiff=0; for(int e=0;e<nEvt;++e){ if(hN[e]!=hN2[e]) reproDiff++;
@@ -119,6 +128,9 @@ int main(int argc,char**argv){
   for(int e=0;e<nEvt;++e){ double omt=1.0-hThr[e]; sum1mT+=omt;
     int b=(int)(omt/TMAX*NB); if(b<0)b=0; if(b>=NB)b=NB-1; hist[b]++; }
   double mean1mT=sum1mT/nEvt;
+  // secondary g->qqbar rate (unpack the base-1000 flavour packing): total + uds/c/b means.
+  long gqqU=0,gqqC=0,gqqB=0; for(int e=0;e<nEvt;++e){ int p=hGqq[e]; gqqB+=p/1000000; gqqC+=(p/1000)%1000; gqqU+=p%1000; }
+  double meanGqq=(double)(gqqU+gqqC+gqqB)/nEvt, meanGU=(double)gqqU/nEvt, meanGC=(double)gqqC/nEvt, meanGB=(double)gqqB/nEvt;
   FILE* fh=fopen("thrust_gpu.dat","w");
   if(fh){ fprintf(fh,"# (1-T)_low  (1-T)_high  normalised_density   [cuPythia GPU FSR shower, %d evts]\n",nEvt);
     for(int b=0;b<NB;++b) fprintf(fh,"%.4f %.4f %.6e\n",b*TMAX/NB,(b+1)*TMAX/NB,hist[b]/((double)nEvt*(TMAX/NB)));
@@ -134,15 +146,34 @@ int main(int argc,char**argv){
   printf("  GPU vs CPU port   : control-flow bit-identical %ld/%d = %.2f%%  (mean mult %.3f vs %.3f)\n",
          structSame, nCPU, 100.0*structSame/nCPU, meanN, meanNcpu);
   printf("                      momenta agree to %.2e (GPU/CPU IEEE transcendental accumulation)\n", maxMomRel);
-#ifdef ME_FIRST
-  bool detOK = (structSame > (long)(0.999*nCPU));  // ME adds a transcendental veto -> rare ULP flips OK (decided a priori)
+#if defined(GLUON_SPLIT) && !defined(ME_FIRST)
+  // G1: apples-to-apples vs Pythia with the SAME plain DGLAP kernel (weightGluonToQuark=1, Pythia
+  // option 1), MEcorr OFF (this LL build). The GPU shower is massless and uses betaQ(z^2+(1-z)^2)
+  // with the same quark m0 (u,d=0.33,s=0.5,c=1.5,b=4.8) and THRESHM2=4.004 pair threshold = option 1.
+  // Pythia's DEFAULT weight is option 4 (massive zCosThe reshape + pow3(1-m2/m2dip) damping) -> a
+  // lower 0.5233; matching that needs the massive-recoil path (future), so it is NOT this build's gate.
+  double gqqTarget=0.5656; bool gqqOK=fabs(meanGqq-gqqTarget)<0.07*gqqTarget;
+  printf("  g->qqbar (2ndary) : N_gqq = %.4f pairs/evt (uds %.4f, c %.4f, b %.4f)\n", meanGqq,meanGU,meanGC,meanGB);
+  printf("  g->qqbar vs Pythia: %.4f vs %.4f (option-1 mecoff; %+.1f%%, 7%% band) -> %s\n",
+         meanGqq, gqqTarget, 100.0*(meanGqq-gqqTarget)/gqqTarget, gqqOK?"PASS":"FAIL");
+#elif defined(GLUON_SPLIT)
+  double gqqTarget=0.5456; bool gqqOK=fabs(meanGqq-gqqTarget)<0.07*gqqTarget; // ME_FIRST -> option-1 mec-on
+  printf("  g->qqbar (2ndary) : N_gqq = %.4f pairs/evt (uds %.4f, c %.4f, b %.4f)\n", meanGqq,meanGU,meanGC,meanGB);
+  printf("  g->qqbar vs Pythia: %.4f vs %.4f (option-1 mec-on; %+.1f%%, 7%% band) -> %s\n",
+         meanGqq, gqqTarget, 100.0*(meanGqq-gqqTarget)/gqqTarget, gqqOK?"PASS":"FAIL");
+#else
+  bool gqqOK=(meanGqq==0.0);   // flag-off MUST give exactly zero g->qqbar -> clean A/B isolation gate
+  printf("  g->qqbar (off)    : N_gqq = %.4f pairs/evt (must be 0) -> %s\n", meanGqq, gqqOK?"PASS":"FAIL");
+#endif
+#if defined(ME_FIRST) || defined(GLUON_SPLIT)
+  bool detOK = (structSame > (long)(0.999*nCPU));  // extra transcendental vetoes -> rare ULP flips OK (a priori)
 #else
   bool detOK = (structSame == nCPU);               // pure LL: exact bit-identical control flow
 #endif
   bool ok = (maxMomViol<1e-5) && (maxM2<1e-3) && (reproDiff==0) &&
             (meanN>2.5&&meanN<25.0) && detOK && (maxMomRel<1e-6) &&
-            (mean1mT>0.01 && mean1mT<0.30);
-  printf("VALIDATION: %s (momentum+on-shell+reproducible+CPU-agreement+thrust-sane)\n", ok?"PASS":"FAIL");
-  cudaFree(dN);cudaFree(dTot);cudaFree(dM2);cudaFree(dThr);
+            (mean1mT>0.01 && mean1mT<0.30) && gqqOK;
+  printf("VALIDATION: %s (momentum+on-shell+reproducible+CPU-agreement+thrust-sane+gqq)\n", ok?"PASS":"FAIL");
+  cudaFree(dN);cudaFree(dTot);cudaFree(dM2);cudaFree(dThr);cudaFree(dGqq);
   return ok?0:2;
 }

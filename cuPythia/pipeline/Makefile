@@ -26,6 +26,19 @@ pdf_lumi_fft: pdf_lumi_fft.cu
 shower_fsr: shower_fsr.cu shower_inc.cuh ../common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
 
+# Optional shower precision variants (compile flags; NOT in `make check`, so the committed LL
+# results stay byte-stable -- each flag is proven byte-identical when OFF). Each adds physics:
+#   ME_FIRST    = direct-ME (POWHEG-style) first/hardest emission
+#   USE_CMW     = CMW soft-coherence alpha_s rescaling
+#   GLUON_SPLIT = final-state g->qqbar splitting (secondary qqbar pairs; forks the colour string).
+#     Validated vs Pythia weightGluonToQuark=1: N_gqq +2.2%; reference counter in thrust_pythia (g2q1).
+shower_fsr_me: shower_fsr.cu shower_inc.cuh ../common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -DME_FIRST -o $@ $<
+shower_fsr_cmw: shower_fsr.cu shower_inc.cuh ../common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -DUSE_CMW -o $@ $<
+shower_fsr_gsplit: shower_fsr.cu shower_inc.cuh ../common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -DGLUON_SPLIT -o $@ $<
+
 bridge: bridge.cu shower_inc.cuh ../common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
 
