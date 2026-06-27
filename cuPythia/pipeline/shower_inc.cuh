@@ -119,7 +119,7 @@ __host__ __device__ inline bool doKin(const double* R,const double* C,double pT2
   return true;
 }
 // Shower one event into local arrays P (px,py,pz,E) and id; return nPartons.
-__host__ __device__ inline int showerEvent(double* P,int* id,uint64_t ctr){
+__host__ __device__ __noinline__ int showerEvent(double* P,int* id,uint64_t ctr){  // __noinline__: keep the kernel compilable (don't inline this giant fn); physics identical
   P[0]=0;P[1]=0;P[2]= EBEAM;P[3]=EBEAM; id[0]= 1;
   P[4]=0;P[5]=0;P[6]=-EBEAM;P[7]=EBEAM; id[1]=-1;
   int n=2; double pT2=0.25*MZ*MZ;

@@ -122,16 +122,22 @@ These are real precision advantages, but of *method* (reproducibility, statistic
    + `combineId` SU(6) Clebsch–Gordan with octet/decuplet split and Λ/Σ disambiguation): a string
    break makes a diquark–antidiquark pair (prob `probQQtoQ`=0.081), forming p/n/Λ/Σ/Ξ/Ω/Δ/Σ*/Ξ* with
    the correct Pythia sign conventions; decuplet + Σ⁰ resonances decay. **Validated:** electric-charge
-   and **baryon-number conservation 0 / 2,000,000 strings** (`baryon_test`), and 4-momentum exact
-   (1.23e-10) in the full hadronizer. **The validator earned its keep — it caught two real bugs that
-   exact 4-momentum conservation completely masked:** (a) a finalTwo *two-diquark* combine →
-   baryon-number violation (fixed: finalTwo uses a single qq̄ pair), and (b) out-of-scope *charm/bottom
-   baryons* from g→qqbar endpoints → charge violation (fixed: baryon breaks only off light uds
-   endpoints; c/b stays D/B mesons). **Honest caveats:** v1 is light (uds) baryons, octet+decuplet,
-   no popcorn, untuned `probQQtoQ`; charm/bottom baryons deferred with the c/b program. **Build note:**
-   `-O3` ptxas on the *combined* shower+hadronizer+decays+baryons kernel is extremely heavy on this
-   box (can exhaust the compiler) — the `hadronize_mr_baryon` target uses `-O1`; the default `-O3`
-   build (baryons off) is unaffected and byte-identical.
+   and **baryon-number conservation 0 / 2,000,000 strings** (`baryon_test`); and in the **full chain**
+   (ME+g→qqbar+decays+baryons, `hadronize_mr_full`) charge + baryon-number conserved **0 / 19334 events**,
+   4-momentum exact (1.23e-10), with **p+p̄ 0.745, Λ+Λ̄ 0.214** per event (right order, ~60–70% of PDG).
+   **The validator earned its keep — it caught two real bugs that exact 4-momentum conservation
+   completely masked:** (a) a finalTwo *two-diquark* combine → baryon-number violation (fixed: finalTwo
+   uses a single qq̄ pair), and (b) out-of-scope *charm/bottom baryons* from g→qqbar endpoints → charge
+   violation (fixed: baryon breaks only off light uds endpoints; c/b stays D/B mesons). **Honest finding:**
+   with *untuned* `probQQtoQ`/Lund params, baryons slightly *reduce* charged mult (18.69 → 17.30) and
+   *worsen* the ALEPH thrust fit (χ²/ndf 10.3 → 13.1) — a conservation-correct mechanism can move the
+   wrong way on data when its rate isn't tuned; closing to 20.73 needs a Lund tune + D/B decays, not
+   more mechanisms. v1 is light (uds) baryons, octet+decuplet, no popcorn; charm/bottom baryons deferred.
+   **Build note (key enabler):** the combined kernel was one monstrous inlined `__global__` that
+   exhausted the compiler; marking the heavy device functions (`showerEvent`, `tryFragmentMR`, `kinHad`,
+   `finalRegion`, `decayEvent`, `regionSetUp`, …) **`__noinline__`** splits it into tractable pieces
+   with **bit-identical physics** (make check 12/12, byte-identical). The full chain then compiles
+   (~10 min at -O2). The default -O3 build (flags off) is unaffected and byte-identical.
 9. **NLO matching** (POWHEG/MC@NLO) — the genuine remaining frontier (a research program, not a
    flag): it requires the NLO virtual+real subtraction and a matching scheme, beyond this LL/LO
    port. Documented honestly as out of scope rather than approximated. (The first-emission ME

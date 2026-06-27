@@ -148,7 +148,7 @@ __host__ __device__ inline void boostByMR(const double* q,double ex,double ey,do
 // (the full O(n^2) table would be ~280 KB/thread of local memory and corrupts). A gluon's
 // momentum is shared 50/50 between its two bordering low regions (the kink).
 struct SysLite { Region low[MAXPART]; int sizeStr,iMax; };
-__host__ __device__ inline void sysLiteSetUp(SysLite& S,const double* P,const int* id,int n){
+__host__ __device__ __noinline__ void sysLiteSetUp(SysLite& S,const double* P,const int* id,int n){
   S.sizeStr=n-1; S.iMax=S.sizeStr-1;
   for(int i=0;i<S.sizeStr;++i){ double p1[4],p2[4];
     for(int k=0;k<4;++k){ p1[k]=P[4*i+k]*((id[i]==21)?0.5:1.0); p2[k]=P[4*(i+1)+k]*((id[i+1]==21)?0.5:1.0); }
@@ -168,7 +168,7 @@ __host__ __device__ inline double w2Region(const SysLite& S,int iPos,int iNeg){
 struct End { int iPos,iNeg; double xPos,xNeg,Gamma,px,py; int flav; };
 
 // Port of StringEnd::kinematicsHadron. Returns true on success, fills had[4] and the *New state.
-__host__ __device__ inline bool kinHad(SysLite& S,bool fromPos,const End& e,
+__host__ __device__ __noinline__ bool kinHad(SysLite& S,bool fromPos,const End& e,
     double zHad,double mT2Had,double mHad,double pxHadIn,double pyHadIn,
     double pxNewIn,double pyNewIn,
     int& iPosNewO,int& iNegNewO,double& xPosNewO,double& xNegNewO,double& GammaNewO,double* had){
@@ -258,7 +258,7 @@ __host__ __device__ inline bool kinHad(SysLite& S,bool fromPos,const End& e,
 }
 
 // finalRegion (port of :1851), simple-and-common cases for an open q..qbar chain.
-__host__ __device__ inline bool finalRegion(const SysLite& S,const End& pos,const End& neg,Region& out){
+__host__ __device__ __noinline__ bool finalRegion(const SysLite& S,const End& pos,const End& neg,Region& out){
   if(pos.iPos==neg.iPos && pos.iNeg==neg.iNeg){ getRegion(S,pos.iPos,pos.iNeg,out); return !out.isEmpty; }
   double pPosJ[4]={0,0,0,0}, pNegJ[4]={0,0,0,0}, tmp[4];
   // remaining p+
@@ -297,7 +297,7 @@ __host__ __device__ inline int findStrings(const int* id,int n,int* starts,int* 
 #else
 #define HADMASS_MR(pdg,ctr) mesonMassMR(pdg)                            // pole masses (default)
 #endif
-__host__ __device__ inline int tryFragmentMR(const double* P,const int* id,int n,uint64_t& ctr,double* H,int* hid,double* hm){
+__host__ __device__ __noinline__ int tryFragmentMR(const double* P,const int* id,int n,uint64_t& ctr,double* H,int* hid,double* hm){
   SysLite S; sysLiteSetUp(S,P,id,n);
   // Endpoint flavours from the actual string ends (q at id[0], qbar at id[n-1]); a g->qqbar fork
   // makes these s/c/b. Identical to the old hard-wired +-1 for the original d...dbar string.
@@ -407,7 +407,7 @@ __host__ __device__ inline int tryFragmentMR(const double* P,const int* id,int n
   for(int k=0;k<4;++k)H[4*nH+k]=h2[k]; hid[nH]=pdg2; hm[nH]=m2; nH++;
   return nH;
 }
-__host__ __device__ inline int hadronizeMR(const double* P,const int* id,int n,uint64_t ctr,double* H,int* hid,double* hm){
+__host__ __device__ __noinline__ int hadronizeMR(const double* P,const int* id,int n,uint64_t ctr,double* H,int* hid,double* hm){
   for(int retry=0; retry<50; ++retry){ int r=tryFragmentMR(P,id,n,ctr,H,hid,hm); if(r>0) return r; }
   return -1;
 }

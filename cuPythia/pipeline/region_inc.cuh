@@ -21,7 +21,7 @@ __host__ __device__ inline double v4dot(const double* a,const double* b){
 struct Region { double pPos[4],pNeg[4],eX[4],eY[4],w2; int colPos,colNeg; bool isSetUp,isEmpty; };
 
 // Port of StringRegion::setUp. isMassless: incoming guaranteed lightlike (cross regions).
-__host__ __device__ inline void regionSetUp(Region& R,const double* p1in,const double* p2in,
+__host__ __device__ __noinline__ void regionSetUp(Region& R,const double* p1in,const double* p2in,
                                             int col1,int col2,bool isMassless){
   const double m2Join=R_MJOIN*R_MJOIN;
   double p1[4],p2[4]; for(int k=0;k<4;++k){p1[k]=p1in[k];p2[k]=p2in[k];}

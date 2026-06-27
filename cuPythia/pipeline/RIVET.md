@@ -34,24 +34,28 @@ RIVET_DATA_PATH=~/.local/share/Rivet RIVET_REF_PATH=~/.local/share/Rivet \
 
 ## Results — HONEST (vs real ALEPH data, 19.4k hadron-level events, best physics ME+g→qqbar)
 
-| observable | cuPythia | ALEPH | gap | dominant cause |
+| observable | no decay | **+decays** | **+decays +baryons** | ALEPH |
 |---|---|---|---|---|
-| observable | cuPythia (no decay) | cuPythia **+decays** | ALEPH | residual w/ decays |
-|---|---|---|---|---|
-| **charged multiplicity** (√s=91.2) | ~11.3 | **18.69** | **20.73 ± 0.21** | **−9.8%** (no baryons/heavy-flavour floor) |
-| thrust **distribution** (d54) χ²/ndf | 39 | **10.3** | — | a **3.8× better** fit (T→1 spike softens) |
+| **charged multiplicity** (√s=91.2) | ~11.3 | **18.69** | 17.30 | **20.73 ± 0.21** |
+| thrust **distribution** (d54) χ²/ndf | 39 | **10.3** | 13.1 | — |
+| p+p̄ / event | 0 | 0 | **0.745** | ~1.05 |
+| Λ+Λ̄ / event | 0 | 0 | **0.214** | ~0.39 |
 
-**The real-data comparison drove the next correction — and it worked.** The no-decay Rivet run cleanly
-identified hadron decays as the #1 gap; adding GPU recursive decays (`-DDECAYS`, see `decay_inc.cuh` /
-PRECISION.md) closes most of it: charged multiplicity **11.3 → 18.69** (toward ALEPH 20.73) and the
-thrust fit improves **χ²/ndf 39 → 10.3** (the T→1 pencil-2-jet excess softens as multiplicity rises),
-with 4-momentum **conservation still exact** (1.23e-10) and the decay module bit-identical GPU≡CPU.
-The residual −9.8% in charged multiplicity is the **documented floor**: no baryons (~5–6% of LEP1
-tracks), heavy flavour only from g→qqbar (not a realistic Z→bb̄/cc̄ rate, D/B left stable), flat-Dalitz
-3-body (no ME shape), untuned Lund params, and no detector simulation. This is the honest landing —
-decays were necessary and sufficient to close most of the gap, the rest is structurally out of scope.
-The Rivet toolchain + HepMC3 interface remain the reusable infrastructure deliverable; the conclusion
-(decays first) is one only a real-data comparison could reveal, not a Pythia-vs-Pythia one.
+**The real-data comparison drove the corrections — honestly, including where one did NOT help.**
+- **Decays (`-DDECAYS`)** were the #1 win the no-decay run identified: charged mult **11.3 → 18.69**,
+  thrust **χ²/ndf 39 → 10.3** (the T→1 pencil-2-jet excess softens), conservation exact, GPU≡CPU.
+- **Baryons (`-DBARYONS`)** are now *validated in the full chain* (electric-charge and baryon-number
+  conserved **0/19334 events**, 4-momentum exact 1.23e-10, p+p̄ and Λ+Λ̄ at the right order ~60–70% of
+  PDG). But with **untuned** `probQQtoQ`/Lund parameters they slightly *reduce* multiplicity
+  (18.69 → 17.30) and *worsen* the thrust fit (χ²/ndf 10.3 → 13.1) — a correct, conservation-exact
+  mechanism can still move the wrong way on data when its rate isn't tuned. **Honest conclusion:**
+  closing the last ~15% to ALEPH 20.73 is a *Lund tune* (a separate multi-histogram fit) **plus** D/B
+  decays (the Z→bb̄/cc̄ heavy-hadron track boost) — not more conservation-correct mechanisms. The
+  baryon *physics* is right; the *normalization* needs tuning, which is out of scope and not faked.
+
+(Build note: the combined shower+multiregion+decays+baryons kernel only compiles after marking the
+heavy device functions `__noinline__` — it was one monstrous inlined `__global__` that exhausted the
+compiler; `__noinline__` splits it into tractable pieces with bit-identical physics. ~10 min at -O2.)
 
 ## Scope note
 The toolchain lives in `~/.local` + `~/rivetbuild/` (not vendored into the repo — it is large and

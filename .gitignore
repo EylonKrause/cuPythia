@@ -69,6 +69,8 @@ cuPythia/pipeline/decay_test
 cuPythia/pipeline/baryon_test
 cuPythia/pipeline/hadronize_mr_baryon
 cuPythia/pipeline/hadronize_mr_b
+cuPythia/pipeline/hadronize_mr_full
+cuPythia/pipeline/hadronize_mr_bd
 cuPythia/pipeline/multiplicity_pythia
 cuPythia/pipeline/hepmc3_writer
 cuPythia/pipeline/*.hepmc3

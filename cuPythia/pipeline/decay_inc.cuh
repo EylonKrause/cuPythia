@@ -148,7 +148,7 @@ __host__ __device__ inline bool threeBody(double M,double m1,double m2,double m3
 
 // Decay one event's primary hadrons (H/hid, nH) into the final stable list (F/fid). Returns nF, or
 // -1 on overflow / kinematic failure (caller drops the event). LIFO stack, no recursion, no alloc.
-__host__ __device__ inline int decayEvent(const double* H,const int* hid,int nH,uint64_t ctr,
+__host__ __device__ __noinline__ int decayEvent(const double* H,const int* hid,int nH,uint64_t ctr,
                                           double* F,int* fid){
   double S[MAXSTACK*4]; int Sid[MAXSTACK]; int sp=0;
   for(int i=nH-1;i>=0;--i){ if(sp>=MAXSTACK) return -1; for(int k=0;k<4;++k)S[4*sp+k]=H[4*i+k]; Sid[sp]=hid[i]; sp++; }
