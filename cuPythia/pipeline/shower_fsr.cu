@@ -147,15 +147,18 @@ int main(int argc,char**argv){
          structSame, nCPU, 100.0*structSame/nCPU, meanN, meanNcpu);
   printf("                      momenta agree to %.2e (GPU/CPU IEEE transcendental accumulation)\n", maxMomRel);
 #if defined(GLUON_SPLIT) && !defined(ME_FIRST)
-  // G1: apples-to-apples vs Pythia with the SAME plain DGLAP kernel (weightGluonToQuark=1, Pythia
-  // option 1), MEcorr OFF (this LL build). The GPU shower is massless and uses betaQ(z^2+(1-z)^2)
-  // with the same quark m0 (u,d=0.33,s=0.5,c=1.5,b=4.8) and THRESHM2=4.004 pair threshold = option 1.
-  // Pythia's DEFAULT weight is option 4 (massive zCosThe reshape + pow3(1-m2/m2dip) damping) -> a
-  // lower 0.5233; matching that needs the massive-recoil path (future), so it is NOT this build's gate.
-  double gqqTarget=0.5656; bool gqqOK=fabs(meanGqq-gqqTarget)<0.07*gqqTarget;
+  // G1: apples-to-apples vs Pythia with the SAME g->qqbar weight, MEcorr OFF. Without G2QQ_WEIGHT4
+  // the GPU uses Pythia option 1 (plain DGLAP betaQ(z^2+(1-z)^2), same quark m0 + THRESHM2=4.004) ->
+  // target 0.5656. With -DG2QQ_WEIGHT4 it adds option-4's high-mass damping -> the DEFAULT 0.5233.
+  #ifdef G2QQ_WEIGHT4
+  double gqqTarget=0.5233; const char* gtag="option-4 mecoff";
+  #else
+  double gqqTarget=0.5656; const char* gtag="option-1 mecoff";
+  #endif
+  bool gqqOK=fabs(meanGqq-gqqTarget)<0.07*gqqTarget;
   printf("  g->qqbar (2ndary) : N_gqq = %.4f pairs/evt (uds %.4f, c %.4f, b %.4f)\n", meanGqq,meanGU,meanGC,meanGB);
-  printf("  g->qqbar vs Pythia: %.4f vs %.4f (option-1 mecoff; %+.1f%%, 7%% band) -> %s\n",
-         meanGqq, gqqTarget, 100.0*(meanGqq-gqqTarget)/gqqTarget, gqqOK?"PASS":"FAIL");
+  printf("  g->qqbar vs Pythia: %.4f vs %.4f (%s; %+.1f%%, 7%% band) -> %s\n",
+         meanGqq, gqqTarget, gtag, 100.0*(meanGqq-gqqTarget)/gqqTarget, gqqOK?"PASS":"FAIL");
 #elif defined(GLUON_SPLIT)
   double gqqTarget=0.5456; bool gqqOK=fabs(meanGqq-gqqTarget)<0.07*gqqTarget; // ME_FIRST -> option-1 mec-on
   printf("  g->qqbar (2ndary) : N_gqq = %.4f pairs/evt (uds %.4f, c %.4f, b %.4f)\n", meanGqq,meanGU,meanGC,meanGB);

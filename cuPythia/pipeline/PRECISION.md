@@ -74,9 +74,12 @@ These are real precision advantages, but of *method* (reproducibility, statistic
    reproducible, drop rate 3.0% (lower — forks simplify the region geometry). Hadron multiplicity
    shifts −0.4% (20.92 vs 21.01): a g→qqbar replaces a multiplicity-enhancing gluon kink with a
    quark string-break, so the small decrease is physical, not a regression. **Honest caveat:** the
-   GPU shower is massless and uses Pythia **option 1**; Pythia's *default* is option 4 (massive
-   zCosThe reshape + pow3(1−m²/m²_dip) damping → a lower 0.5233), which needs the massive-recoil
-   `doKin` path (future). So this validates the LL kernel, not the option-4 phenomenology.
+   GPU shower is massless and uses Pythia **option 1** by default. Pythia's *default* weight is
+   **option 4** (zCosThe reshape + (1+m²Rat)(1−m²Rat)² high-mass damping); `-DG2QQ_WEIGHT4` applies
+   that full weight (with a veto oversample, since zCosThe makes it exceed 1) and reproduces the
+   **default rate 0.5233 to +1.9%** — so cuPythia matches *both* of Pythia's kernel choices. The
+   produced kinematics stay massless (the zCosThe massive-recoil construction is a future `doKin`
+   path), so `-DG2QQ_WEIGHT4` is a **rate-level** match to the default, not its exact z-distribution.
 4. **Breit–Wigner vector masses — DONE & VALIDATED** (`bw_inc.cuh`, `-DUSE_BW`). Vector
    mesons (ρ, K*, ω, φ) get a relativistic Breit-Wigner mass (Lorentzian in s, truncated ±3Γ,
    exact inverse-CDF, one RNG draw, on-shell check uses the *sampled* mass). On the straight-

@@ -12,6 +12,9 @@ static const double EBEAM  = 0.5*MZ;        // each initial quark energy
 static const double PT2MIN = 0.5*0.5;       // (TimeShower:pTmin = 0.5 GeV)^2 cutoff
 static const double ASMZ   = 0.1365;        // alpha_s(M_Z)
 #define MAXP 64
+#ifdef G2QQ_WEIGHT4
+#define G2Q4_OVER 4.0   // veto oversample for the option-4 g->qqbar weight (zCosThe makes it >1 in places)
+#endif
 
 // 1-loop running alpha_s, flavour-threshold matched (n_f=5,4,3 across m_b,m_c).
 __host__ __device__ inline double alphaS(double mu2){
@@ -146,6 +149,9 @@ __host__ __device__ inline int showerEvent(double* P,int* id,uint64_t ctr){
         // without the 1/2, N_gqq came out 2.14x the Pythia reference.) Adding IoverSplit only shrinks
         // the trial step; the veto stays EXACT for g->gg (unbiased).
         double IoverSplit=(!isQ)?(amax/(2.0*M_PI))*0.25*5.0*(zmaxc-zc):0.0;
+#ifdef G2QQ_WEIGHT4
+        IoverSplit*=G2Q4_OVER;   // oversample: the option-4 weight exceeds 1 in places -> keep the veto valid
+#endif
         Iover+=IoverSplit;
 #endif
         double t=pT2;
@@ -183,7 +189,20 @@ __host__ __device__ inline int showerEvent(double* P,int* id,uint64_t ctr){
                 double mq=(flav==5)?4.8:((flav==4)?1.5:((flav==3)?0.5:0.33));
                 if(m2v>=4.004*mq*mq){                                  // = Pythia THRESHM2 pair threshold
                   double beta=sqrt(fmax(0.0,1.0-4.0*mq*mq/m2v));       // = Pythia betaQ
-                  w=beta*(zz*zz+(1.0-zz)*(1.0-zz));                    // NO T_R (already in IoverSplit)
+#ifdef G2QQ_WEIGHT4
+                  // Pythia DEFAULT weightGluonToQuark=4 (SimpleTimeShower.cc 2937-2943): the zCosThe
+                  // reshape + (1+m2Rat)/(1-m2Rat)*pow3(1-m2Rat) = *(1+m2Rat)(1-m2Rat)^2 damping.
+                  // zCosThe pushes z outside [0,1] so w>1 in places -> the IoverSplit*G2Q4_OVER
+                  // oversample (and /G2Q4_OVER here) keep accept<=1, rate unchanged. Matches option-4's
+                  // RATE; produced kinematics stay massless (the zCosThe massive-recoil construction is
+                  // future) -> a rate-level match to Pythia's DEFAULT, not its exact z-distribution.
+                  double m2Rat=m2v/m2Dip, ratioQ=mq*mq/m2v;
+                  double zct=((1.0+m2Rat)*zz-m2Rat)/(1.0-m2Rat);
+                  w=beta*(zct*zct+(1.0-zct)*(1.0-zct)+8.0*ratioQ*zct*(1.0-zct))
+                      *(1.0+m2Rat)*(1.0-m2Rat)*(1.0-m2Rat)/G2Q4_OVER;
+#else
+                  w=beta*(zz*zz+(1.0-zz)*(1.0-zz));                    // option 1: plain DGLAP (NO T_R; in IoverSplit)
+#endif
                 } else w=-1.0;                                         // below pair threshold -> veto
               } else w=isQ?0.5*(1.0+zz*zz):0.5*(1.0+zz*zz*zz);
               if(w>0.0 && R3<(alphaS(t)/amax)*w){

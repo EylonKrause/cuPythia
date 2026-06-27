@@ -38,6 +38,10 @@ shower_fsr_cmw: shower_fsr.cu shower_inc.cuh ../common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -DUSE_CMW -o $@ $<
 shower_fsr_gsplit: shower_fsr.cu shower_inc.cuh ../common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -DGLUON_SPLIT -o $@ $<
+# g->qqbar with Pythia's DEFAULT option-4 weight (zCosThe reshape + high-mass damping) -> matches
+# the default rate 0.5233 (+1.9%) instead of the plain-kernel 0.5656; massless kinematics (rate match).
+shower_fsr_g2q4: shower_fsr.cu shower_inc.cuh ../common/rng.cuh
+	$(NVCC) $(NVCCFLAGS) -DGLUON_SPLIT -DG2QQ_WEIGHT4 -o $@ $<
 
 bridge: bridge.cu shower_inc.cuh ../common/rng.cuh
 	$(NVCC) $(NVCCFLAGS) -o $@ $<
