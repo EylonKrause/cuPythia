@@ -32,13 +32,14 @@ counter-based, so any single event is **O(1)-reproducible** on any node.
   on-shellness **1.5e-12**, GPU re-runs bit-identical, and the **control flow is 100%
   bit-identical to an independent CPU port** (momenta agree to 1.4e-12, GPU/CPU IEEE limit).
   **Physics validated vs Pythia's own SimpleTimeShower** (`thrust_pythia.cc`, identical
-  setup; `compare_thrust.sh`): the **thrust** distribution agrees to **5.2% (mean over all
+  setup; `compare_thrust.sh`): the **thrust** distribution agrees to **4.0% (mean over all
   bins)** vs Pythia with ME-corrections off — the apples-to-apples LL comparison — with
-  ⟨1−T⟩ 0.0684 vs 0.0698. The 23.8% spread vs *default* Pythia is precisely its ME
-  corrections, a higher-order effect no LL shower (GAPS included) carries. Scope: FSR-only,
-  massless, q→qg & g→gg; g→qq̄ + flavour-threshold α_s + ME corrections are the documented
-  residuals / next steps. (NB: `TimeShower:nGluonToQuark=0` hangs Pythia 8.317, so the
-  reference keeps g→qq̄ on.)
+  ⟨1−T⟩ 0.0690 vs 0.0698. The 23.8% spread vs *default* Pythia is precisely its ME
+  corrections, a higher-order effect no LL shower (GAPS included) carries. Now includes
+  **flavour-threshold α_s** (n_f=5,4,3 across m_b,m_c; tightened the fit 5.2%→4.0%). Scope:
+  FSR-only, massless, q→qg & g→gg; the ~4% residual is g→qq̄ + exact-Λ α_s + MC statistics,
+  and ME corrections are the LL→NLL next step. (NB: `TimeShower:nGluonToQuark=0` hangs
+  Pythia 8.317, so the reference keeps g→qq̄ on.)
 - [ ] stage 4 — hadronization on device (feasibility-gated) + decays
 - [ ] stage 5 — standard I/O (spec-valid LHE / HepMC3 / Rivet smoke test)
 

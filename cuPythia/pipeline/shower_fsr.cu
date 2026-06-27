@@ -36,13 +36,22 @@ static const double MZ     = 91.1876;       // Z mass / CM energy
 static const double EBEAM  = 0.5*MZ;        // each initial quark energy
 static const double PT2MIN = 0.5*0.5;       // (TimeShower:pTmin = 0.5 GeV)^2 cutoff
 static const double ASMZ   = 0.1365;        // alpha_s(M_Z) (TimeShower:alphaSvalue)
-static const double B0P    = (33.0-2.0*5.0)/(12.0*M_PI); // 1-loop beta0/(...), n_f=5
 #define MAXP 64
 
-// 1-loop running alpha_s referenced to M_Z, fixed n_f=5 (no threshold matching).
+// 1-loop running alpha_s referenced to alpha_s(M_Z)=0.1365, with FLAVOUR-THRESHOLD
+// matching (n_f = 5,4,3 across m_b, m_c) — closes one residual vs Pythia, which fixed
+// n_f=5 did not. 1/alpha runs continuously; below each threshold beta0 grows so alpha
+// rises faster (the physically larger low-scale coupling Pythia also uses).
 __host__ __device__ inline double alphaS(double mu2){
-  double d = 1.0 + ASMZ*B0P*log(mu2/(MZ*MZ));
-  return (d>1e-3) ? ASMZ/d : 10.0;          // guard the Landau region (mu2 stays >= PT2MIN)
+  const double mc2=1.5*1.5, mb2=4.8*4.8, mZ2=MZ*MZ;
+  const double b5=(33.0-2.0*5.0)/(12.0*M_PI), b4=(33.0-2.0*4.0)/(12.0*M_PI), b3=(33.0-2.0*3.0)/(12.0*M_PI);
+  double inv=1.0/ASMZ;                         // 1/alpha at M_Z (n_f=5)
+  if(mu2>=mb2){ inv+=b5*log(mu2/mZ2); }
+  else { inv+=b5*log(mb2/mZ2);                 // n_f=5: M_Z -> m_b
+    if(mu2>=mc2){ inv+=b4*log(mu2/mb2); }      // n_f=4: m_b -> mu
+    else { inv+=b4*log(mc2/mb2)+b3*log(mu2/mc2); } } // n_f=4: m_b->m_c, n_f=3: m_c->mu
+  double a=1.0/inv;
+  return (a>0.0 && a<10.0)? a : 10.0;          // guard the Landau region (mu2 stays >= PT2MIN)
 }
 __host__ __device__ inline double mass2(const double* a,const double* b){
   double e=a[3]+b[3],x=a[0]+b[0],y=a[1]+b[1],z=a[2]+b[2]; return e*e-x*x-y*y-z*z;
