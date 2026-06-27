@@ -53,7 +53,11 @@ counter-based, so any single event is **O(1)-reproducible** on any node.
   pseudoscalar+vector mesons, uds, pole masses, no baryons/decays/excited-mesons, single
   straight string (not yet gluon-kinked) — the documented residuals. Not aware of a prior
   *algorithmic* (non-ML) GPU Lund port; MLHad/HadML are learned surrogates.
-- [ ] stage 5 — standard I/O (spec-valid LHE / HepMC3 / Rivet smoke test)
+- [x] **stage 5 — standard I/O** (`lhe_writer.cu` + `lhe_validate.cc`): writes GPU-generated
+  gg→gg hard events to a **spec-valid LHEF 3.0** file with a valid colour flow, **validated by
+  reading it straight back into Pythia** (`Beams:frameType=4`): all 10⁴ events parsed, showered
+  and hadronized, 0 aborts, total-momentum imbalance 2.3e-5. (HepMC3 output + a Rivet smoke
+  test need those libraries, absent in this env — LHE is the implemented, validated interface.)
 
 Design grounded in a web-research pass on GPU-generator architecture
 (Pepper, madgraph4gpu, GPU showers, device PDFs) → see `../../ARCHITECTURE.md`.

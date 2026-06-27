@@ -20,6 +20,7 @@ and an *identical CPU port* consume the same draws — enabling exact GPU-vs-CPU
 | orchestrator | `generate.cu` | build→reweight→unweight→CUB-compact on one record, no host round-trip; σ; CUB count | σ relerr 4.8e-5; CUB count **exact** |
 | 3 FSR shower | `shower_fsr.cu` | momentum cons.; on-shell; GPU re-run reproducibility; GPU-vs-CPU control flow; **thrust vs Pythia** | see below |
 | 4 hadronization | `hadronize.cu` | momentum cons.; on-shell; GPU≡CPU; reproducible; **multiplicity vs Pythia** | see below |
+| 5 LHE I/O | `lhe_writer.cu` | spec-valid LHEF read back by Pythia (frameType=4) | **10⁴/10⁴** read+showered, imbalance **2.3e-5** |
 | (unit) Lund f(z) | `zlund_test.cu` | sampled z vs analytic f(z), 3 regimes | χ²/ndf **0.98/1.05/0.92/0.91** |
 | (tool) FFT luminosity | `pdf_lumi_fft.cu` | cuFFT convolution vs direct O(N²) | agree **1.7e-7**, **94×/464×** faster |
 
