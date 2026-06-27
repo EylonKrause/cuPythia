@@ -20,7 +20,8 @@ using namespace Pythia8;
 
 int main(int argc,char**argv){
   int nEvt=(argc>1)?atoi(argv[1]):200000;
-  bool mecOff=(argc>2 && std::string(argv[2])=="mecoff");  // LL apples-to-apples with the GPU shower
+  bool mecOff=false, cmw=false;
+  for(int a=2;a<argc;++a){ std::string s(argv[a]); if(s=="mecoff")mecOff=true; if(s=="cmw")cmw=true; }
   Pythia pythia;
   pythia.readString("Beams:idA = -11");                  // e+   (matches Pythia example main111)
   pythia.readString("Beams:idB = 11");                   // e-
@@ -34,6 +35,7 @@ int main(int argc,char**argv){
   pythia.readString("TimeShower:QEDshowerByQ = off");    // QCD FSR only
   pythia.readString("TimeShower:pTmin = 0.5");            // match the GPU shower cutoff
   if(mecOff) pythia.readString("TimeShower:MEcorrections = off"); // LL shower, like the GPU shower
+  if(cmw)    pythia.readString("TimeShower:alphaSuseCMW = on");   // soft-coherence NLL rescaling
   pythia.readString("Print:quiet = on");
   pythia.readString("Next:numberCount = 0");
   if(!pythia.init()){ printf("Pythia init failed\n"); return 1; }
@@ -45,7 +47,8 @@ int main(int argc,char**argv){
     double omt=1.0-thr.thrust(); sum1mT+=omt; nAcc++;
     int b=(int)(omt/TMAX*NB); if(b<0)b=0; if(b>=NB)b=NB-1; hist[b]++; }
 
-  const char* fn = mecOff ? "thrust_pythia_mecoff.dat" : "thrust_pythia.dat";
+  const char* fn = cmw ? "thrust_pythia_mecoff_cmw.dat"
+                       : (mecOff ? "thrust_pythia_mecoff.dat" : "thrust_pythia.dat");
   FILE* f=fopen(fn,"w");
   if(f){ fprintf(f,"# (1-T)_low  (1-T)_high  normalised_density   [Pythia 8.317 FSR, MEcorr=%s, %ld evts]\n",
             mecOff?"off":"on", nAcc);

@@ -45,6 +45,7 @@ cuPythia/pipeline/generate
 cuPythia/pipeline/pdf_xsec
 cuPythia/pipeline/pdf_lumi_fft
 cuPythia/pipeline/shower_fsr
+cuPythia/pipeline/shower_fsr_cmw
 cuPythia/pipeline/thrust_pythia
 cuPythia/pipeline/multiplicity_pythia
 cuPythia/pipeline/zlund_test

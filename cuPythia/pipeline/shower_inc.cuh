@@ -23,6 +23,13 @@ __host__ __device__ inline double alphaS(double mu2){
     if(mu2>=mc2){ inv+=b4*log(mu2/mb2); }
     else { inv+=b4*log(mc2/mb2)+b3*log(mu2/mc2); } }
   double a=1.0/inv;
+#ifdef USE_CMW
+  // Catani-Marchesini-Webber rescaling for soft-gluon coherence (NLL accuracy):
+  // alpha_s -> alpha_s (1 + alpha_s K/2pi),  K = C_A(67/18 - pi^2/6) - 5 n_f/9.
+  { int nf=(mu2>=mb2)?5:((mu2>=mc2)?4:3);
+    double K=3.0*(67.0/18.0 - M_PI*M_PI/6.0) - 5.0*nf/9.0;
+    a*=(1.0 + a*K/(2.0*M_PI)); }
+#endif
   return (a>0.0 && a<10.0)? a : 10.0;
 }
 __host__ __device__ inline double mass2(const double* a,const double* b){

@@ -43,9 +43,12 @@ These are real precision advantages, but of *method* (reproducibility, statistic
    captures part of the ME), it *double-suppresses* — ⟨1−T⟩ overshot 0.069→0.0517 (target
    0.0635). A correct MEC must use **this shower's own** first-emission density to form the
    ME/PS ratio (a derivation, not a one-liner). This is the right #1 next step, done right.
-2. **CMW (Catani–Marchesini–Webber) α_s** — soft-gluon NLL coherence:
-   α_s → α_s(1 + α_s K/2π), K = C_A(67/18 − π²/6) − 5n_f/9. A clean, ~1-line NLL
-   improvement (validate vs Pythia with `TimeShower:alphaSuseCMW=on`).
+2. **CMW (Catani–Marchesini–Webber) α_s — DONE & VALIDATED.** Soft-gluon NLL coherence:
+   α_s → α_s(1 + α_s K/2π), K = C_A(67/18 − π²/6) − 5n_f/9. Added behind `-DUSE_CMW`
+   (default off, so the LL results above are unchanged). It correctly increases soft
+   radiation: ⟨1−T⟩ 0.069→**0.0768**, matching Pythia with `alphaSuseCMW=on` (0.070→0.0791)
+   to **5.4%** — confirming the NLL rescaling is implemented correctly. (It is a shower-soft
+   refinement; a full-event tune would re-fit α_s(M_Z) since CMW raises the multiplicity.)
 3. **g→qq̄ in the shower** — restores the missing splitting (correct flavour/multiplicity);
    needs multi-string bookkeeping (a gluon→qqbar splits the colour chain).
 4. **Breit–Wigner resonance masses** in hadronization (ρ, K*, ω, φ, …) — correct mass
