@@ -31,8 +31,14 @@ counter-based, so any single event is **O(1)-reproducible** on any node.
   **recoil kinematics**. Validated on e⁺e⁻→Z→qq̄: 4-momentum conservation **1.8e-9**,
   on-shellness **1.5e-12**, GPU re-runs bit-identical, and the **control flow is 100%
   bit-identical to an independent CPU port** (momenta agree to 1.4e-12, GPU/CPU IEEE limit).
-  Scope: FSR-only, massless, q→qg & g→gg (g→qq̄ + flavour thresholds = TODO); Rivet
-  observables vs Pythia are the next validation layer.
+  **Physics validated vs Pythia's own SimpleTimeShower** (`thrust_pythia.cc`, identical
+  setup; `compare_thrust.sh`): the **thrust** distribution agrees to **5.2% (mean over all
+  bins)** vs Pythia with ME-corrections off — the apples-to-apples LL comparison — with
+  ⟨1−T⟩ 0.0684 vs 0.0698. The 23.8% spread vs *default* Pythia is precisely its ME
+  corrections, a higher-order effect no LL shower (GAPS included) carries. Scope: FSR-only,
+  massless, q→qg & g→gg; g→qq̄ + flavour-threshold α_s + ME corrections are the documented
+  residuals / next steps. (NB: `TimeShower:nGluonToQuark=0` hangs Pythia 8.317, so the
+  reference keeps g→qq̄ on.)
 - [ ] stage 4 — hadronization on device (feasibility-gated) + decays
 - [ ] stage 5 — standard I/O (spec-valid LHE / HepMC3 / Rivet smoke test)
 

@@ -152,7 +152,26 @@ __host__ __device__ inline int showerEvent(double* P,int* id,uint64_t ctr){
   return n;
 }
 
-__global__ void showerKernel(int nEvt,uint64_t base,int* outN,double* outTot,double* outM2){
+// Event thrust T = max_n  sum_i |p_i . n| / sum_i |p_i|, by the standard iterative
+// fixed-point (n -> sum_i sign(p_i.n) p_i, renormalise) with a few seed axes.
+__host__ __device__ inline double thrust(const double* P,int n){
+  double psum=0; for(int i=0;i<n;++i) psum+=sqrt(P[4*i]*P[4*i]+P[4*i+1]*P[4*i+1]+P[4*i+2]*P[4*i+2]);
+  if(psum<=0) return 1.0;
+  double Tbest=0;
+  for(int s=0;s<n;++s){           // seed from every particle direction (robust for multi-jet events)
+    double ax=P[4*s],ay=P[4*s+1],az=P[4*s+2]; double a=sqrt(ax*ax+ay*ay+az*az);
+    if(a<1e-12) continue; ax/=a;ay/=a;az/=a;
+    for(int it=0;it<20;++it){ double nx=0,ny=0,nz=0;
+      for(int i=0;i<n;++i){ double d=P[4*i]*ax+P[4*i+1]*ay+P[4*i+2]*az; double sg=(d>=0)?1.0:-1.0;
+        nx+=sg*P[4*i];ny+=sg*P[4*i+1];nz+=sg*P[4*i+2]; }
+      double nn=sqrt(nx*nx+ny*ny+nz*nz); if(nn<1e-12) break; ax=nx/nn;ay=ny/nn;az=nz/nn; }
+    double num=0; for(int i=0;i<n;++i) num+=fabs(P[4*i]*ax+P[4*i+1]*ay+P[4*i+2]*az);
+    Tbest=fmax(Tbest,num/psum);
+  }
+  return Tbest;
+}
+
+__global__ void showerKernel(int nEvt,uint64_t base,int* outN,double* outTot,double* outM2,double* outThr){
   int e=blockIdx.x*(int)blockDim.x+threadIdx.x; if(e>=nEvt) return;
   double P[MAXP*4]; int id[MAXP];
   int n=showerEvent(P,id, base + (uint64_t)e*0x9E3779B97F4A7C15ULL);
@@ -161,6 +180,7 @@ __global__ void showerKernel(int nEvt,uint64_t base,int* outN,double* outTot,dou
     double m2=P[4*i+3]*P[4*i+3]-P[4*i]*P[4*i]-P[4*i+1]*P[4*i+1]-P[4*i+2]*P[4*i+2];
     mm=fmax(mm,fabs(m2)); }
   outN[e]=n; outTot[4*e]=s0;outTot[4*e+1]=s1;outTot[4*e+2]=s2;outTot[4*e+3]=s3; outM2[e]=mm;
+  outThr[e]=thrust(P,n);
 }
 
 int main(int argc,char**argv){
@@ -168,23 +188,25 @@ int main(int argc,char**argv){
   int TPB=128, blocks=(nEvt+TPB-1)/TPB;        // GAPS-optimal 128 threads/block
   uint64_t base=0x5110UL;
 
-  int *dN; double *dTot,*dM2;
-  CK(cudaMalloc(&dN,(size_t)nEvt*4)); CK(cudaMalloc(&dTot,(size_t)nEvt*32)); CK(cudaMalloc(&dM2,(size_t)nEvt*8));
+  int *dN; double *dTot,*dM2,*dThr;
+  CK(cudaMalloc(&dN,(size_t)nEvt*4)); CK(cudaMalloc(&dTot,(size_t)nEvt*32));
+  CK(cudaMalloc(&dM2,(size_t)nEvt*8)); CK(cudaMalloc(&dThr,(size_t)nEvt*8));
 
   cudaEvent_t t0,t1; CK(cudaEventCreate(&t0)); CK(cudaEventCreate(&t1));
   CK(cudaEventRecord(t0));
-  showerKernel<<<blocks,TPB>>>(nEvt,base,dN,dTot,dM2);
+  showerKernel<<<blocks,TPB>>>(nEvt,base,dN,dTot,dM2,dThr);
   CK(cudaEventRecord(t1)); CK(cudaEventSynchronize(t1));
   float ms=0; CK(cudaEventElapsedTime(&ms,t0,t1));
 
-  std::vector<int> hN(nEvt); std::vector<double> hTot((size_t)nEvt*4),hM2(nEvt);
+  std::vector<int> hN(nEvt); std::vector<double> hTot((size_t)nEvt*4),hM2(nEvt),hThr(nEvt);
   CK(cudaMemcpy(hN.data(),dN,(size_t)nEvt*4,cudaMemcpyDeviceToHost));
   CK(cudaMemcpy(hTot.data(),dTot,(size_t)nEvt*32,cudaMemcpyDeviceToHost));
   CK(cudaMemcpy(hM2.data(),dM2,(size_t)nEvt*8,cudaMemcpyDeviceToHost));
+  CK(cudaMemcpy(hThr.data(),dThr,(size_t)nEvt*8,cudaMemcpyDeviceToHost));
 
   // (1) reproducibility: a second identical launch must be bit-identical.
   std::vector<int> hN2(nEvt); std::vector<double> hTot2((size_t)nEvt*4);
-  showerKernel<<<blocks,TPB>>>(nEvt,base,dN,dTot,dM2); CK(cudaDeviceSynchronize());
+  showerKernel<<<blocks,TPB>>>(nEvt,base,dN,dTot,dM2,dThr); CK(cudaDeviceSynchronize());
   CK(cudaMemcpy(hN2.data(),dN,(size_t)nEvt*4,cudaMemcpyDeviceToHost));
   CK(cudaMemcpy(hTot2.data(),dTot,(size_t)nEvt*32,cudaMemcpyDeviceToHost));
   long reproDiff=0; for(int e=0;e<nEvt;++e){ if(hN[e]!=hN2[e]) reproDiff++;
@@ -210,18 +232,30 @@ int main(int argc,char**argv){
       maxMomRel=fmax(maxMomRel,d/MZ); } }
   double meanNcpu=(double)sumNcpu/nCPU;
 
+  // thrust observable: mean(1-T) and a normalised (1-T) histogram dumped for Pythia comparison.
+  const int NB=20; const double TMAX=0.5; long hist[NB]={0}; double sum1mT=0;
+  for(int e=0;e<nEvt;++e){ double omt=1.0-hThr[e]; sum1mT+=omt;
+    int b=(int)(omt/TMAX*NB); if(b<0)b=0; if(b>=NB)b=NB-1; hist[b]++; }
+  double mean1mT=sum1mT/nEvt;
+  FILE* fh=fopen("thrust_gpu.dat","w");
+  if(fh){ fprintf(fh,"# (1-T)_low  (1-T)_high  normalised_density   [cuPythia GPU FSR shower, %d evts]\n",nEvt);
+    for(int b=0;b<NB;++b) fprintf(fh,"%.4f %.4f %.6e\n",b*TMAX/NB,(b+1)*TMAX/NB,hist[b]/((double)nEvt*(TMAX/NB)));
+    fclose(fh); }
+
   printf("FSR dipole shower on GPU (e+e- -> Z -> q qbar, sqrt(s)=%.4f GeV, %d events)\n",MZ,nEvt);
   printf("  throughput        : %.2f ms  (%.2f M events/s)\n", ms, nEvt/ms/1e3);
   printf("  multiplicity      : mean %.3f partons  (min %d, max %d)\n", meanN, minN, maxN);
   printf("  4-mom conservation: max|deviation| = %.2e GeV\n", maxMomViol);
   printf("  on-shellness      : max|p^2|        = %.2e GeV^2\n", maxM2);
+  printf("  thrust            : <1-T> = %.4f  (histogram -> thrust_gpu.dat)\n", mean1mT);
   printf("  reproducibility   : GPU re-run diffs = %ld  (counter-RNG)\n", reproDiff);
   printf("  GPU vs CPU port   : control-flow bit-identical %ld/%d = %.2f%%  (mean mult %.3f vs %.3f)\n",
          structSame, nCPU, 100.0*structSame/nCPU, meanN, meanNcpu);
   printf("                      momenta agree to %.2e (GPU/CPU IEEE transcendental accumulation)\n", maxMomRel);
   bool ok = (maxMomViol<1e-5) && (maxM2<1e-3) && (reproDiff==0) &&
-            (meanN>2.5&&meanN<25.0) && (structSame==nCPU) && (maxMomRel<1e-6);
-  printf("VALIDATION: %s (momentum+on-shell+reproducible+CPU-agreement)\n", ok?"PASS":"FAIL");
-  cudaFree(dN);cudaFree(dTot);cudaFree(dM2);
+            (meanN>2.5&&meanN<25.0) && (structSame==nCPU) && (maxMomRel<1e-6) &&
+            (mean1mT>0.01 && mean1mT<0.30);
+  printf("VALIDATION: %s (momentum+on-shell+reproducible+CPU-agreement+thrust-sane)\n", ok?"PASS":"FAIL");
+  cudaFree(dN);cudaFree(dTot);cudaFree(dM2);cudaFree(dThr);
   return ok?0:2;
 }

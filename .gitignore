@@ -45,6 +45,9 @@ cuPythia/pipeline/generate
 cuPythia/pipeline/pdf_xsec
 cuPythia/pipeline/pdf_lumi_fft
 cuPythia/pipeline/shower_fsr
+cuPythia/pipeline/thrust_pythia
+cuPythia/pipeline/pmin
+cuPythia/pipeline/*.dat
 cuPythia/pipeline/**/gen
 cuPythia/**/*.lhe
 cuPythia/**/err*.log
