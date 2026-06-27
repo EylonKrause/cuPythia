@@ -32,6 +32,35 @@ __host__ __device__ inline double alphaS(double mu2){
 #endif
   return (a>0.0 && a<10.0)? a : 10.0;
 }
+#ifdef ME_FIRST
+// Generate the HARDEST emission directly from the exact O(alpha_s) gamma*/Z->q qbar g matrix
+// element (POWHEG-style), via a proper pT-ORDERED Sudakov veto (a one-shot sample would miss
+// the Sudakov -> wrong 2-jet/3-jet rate). Variables t=pT^2/Q^2, y=0.5 ln((1-x1)/(1-x2)):
+//   dsigma ~ alpha_s(t) (x1^2+x2^2) dt/t dy,  pT^2=Q^2 (1-x1)(1-x2),  x1+x2>=1 (Dalitz).
+// Overestimate (x1^2+x2^2)<=2, alpha_s(t)<=alpha_s(ptmin2); first accept = hardest w/ Sudakov.
+__host__ __device__ inline bool sampleFirstEmission(uint64_t& ctr,double Q2,double ptmin2,
+                                                    double* x1o,double* x2o,double* pt2o){
+  double tmin=ptmin2/Q2, tmax=0.25; if(tmin>=tmax) return false;
+  double ymax=acosh(1.0/(2.0*sqrt(tmin)));    // max rapidity (Dalitz boundary at tmin)
+  double amax=alphaS(ptmin2);                  // SAME overestimate the shower uses
+  const double CF2pi=(4.0/3.0)/(2.0*M_PI);     // C_F/2pi prefactor of the ME rate
+  // Integrated overestimate per d(ln t): amax*(C_F/2pi)*2*(2 ymax). The C_F/2pi MUST be here
+  // (it sets the absolute emission rate); the accept (alpha_s/amax)*(x1^2+x2^2)/2 then matches.
+  double Iover=4.0*amax*ymax*CF2pi;
+  double t=tmax;
+  for(int it=0; it<5000; ++it){
+    double R1=u01(splitmix64(ctr++)); t*=pow(R1,1.0/Iover);   // Sudakov step downward
+    if(t<tmin) return false;                                  // no emission -> 2-jet
+    double y =(2.0*u01(splitmix64(ctr++))-1.0)*ymax;          // draw 2: rapidity
+    double Ra=u01(splitmix64(ctr++));                         // draw 3: ME-shape + running-as
+    double st=sqrt(t), u=st*exp(y), v=st*exp(-y);
+    if(u>=1.0||v>=1.0||u+v>1.0) continue;                     // outside the Dalitz region
+    double X1=1.0-u, X2=1.0-v, p2=t*Q2;
+    if(Ra < (alphaS(p2)/amax)*0.5*(X1*X1+X2*X2)){ *x1o=X1;*x2o=X2;*pt2o=p2; return true; }
+  }
+  return false;
+}
+#endif
 __host__ __device__ inline double mass2(const double* a,const double* b){
   double e=a[3]+b[3],x=a[0]+b[0],y=a[1]+b[1],z=a[2]+b[2]; return e*e-x*x-y*y-z*z;
 }
@@ -73,6 +102,24 @@ __host__ __device__ inline int showerEvent(double* P,int* id,uint64_t ctr){
   P[0]=0;P[1]=0;P[2]= EBEAM;P[3]=EBEAM; id[0]= 1;
   P[4]=0;P[5]=0;P[6]=-EBEAM;P[7]=EBEAM; id[1]=-1;
   int n=2; double pT2=0.25*MZ*MZ;
+#ifdef ME_FIRST
+  // Replace the first/hardest emission with the EXACT Z->qqg ME, then shower below its pT
+  // (color order q, g, qbar). No (1+z^2) kernel here -> no double-count with the LL veto.
+  { double x1,x2,pt2;
+    if(sampleFirstEmission(ctr, MZ*MZ, PT2MIN, &x1,&x2,&pt2)){
+      double E1=0.5*MZ*x1, E2=0.5*MZ*x2, E3=MZ-E1-E2;
+      double c12=1.0-2.0*(x1+x2-1.0)/(x1*x2); if(c12>1.0)c12=1.0; if(c12<-1.0)c12=-1.0;
+      double s12=sqrt(fmax(0.0,1.0-c12*c12));
+      double phi=2.0*M_PI*u01(splitmix64(ctr++)), cph=cos(phi),sph=sin(phi);
+      double qbx=E2*s12, qbz=E2*c12;               // qbar; q is along +z
+      double gx=-qbx, gz=-(E1+qbz);                 // g = -(q+qbar) (q has no x)
+      P[0]=0;P[1]=0;P[2]=E1;P[3]=E1; id[0]=1;                                   // q  (+z)
+      P[4]=gx*cph; P[5]=gx*sph; P[6]=gz; P[7]=E3; id[1]=21;                     // g
+      P[8]=qbx*cph; P[9]=qbx*sph; P[10]=qbz; P[11]=E2; id[2]=-1;                // qbar
+      n=3; pT2=pt2;
+    }
+  }
+#endif
   for(int step=0; step<MAXP; ++step){
     double bestT=PT2MIN, bestZ=0; int bRad=-1,bRec=-1;
     for(int i=0;i<n;++i){

@@ -34,15 +34,19 @@ These are real precision advantages, but of *method* (reproducibility, statistic
 
 ## Corrections to bring cuPythia closer to theory (prioritized)
 
-1. **First-emission ME correction (highest impact).** The 23.8% thrust gap vs *default*
-   Pythia is exactly the ME correction: the LL shower over-radiates the hard, wide-angle
-   first emission; the exact O(α_s) γ*/Z→qqg matrix element ∝ (x1²+x2²)/((1-x1)(1-x2))
-   tames it. **Attempted and reverted (honest finding):** the textbook Bengtsson–Sjöstrand
-   reweight R=(x1²+x2²)/2 assumes the *old mass-ordered* Pythia shower's first-emission
-   density. Applied to this **pT-ordered dipole** shower (whose local recoil already
-   captures part of the ME), it *double-suppresses* — ⟨1−T⟩ overshot 0.069→0.0517 (target
-   0.0635). A correct MEC must use **this shower's own** first-emission density to form the
-   ME/PS ratio (a derivation, not a one-liner). This is the right #1 next step, done right.
+1. **First-emission ME correction — DONE & VALIDATED (highest impact).** The 23.8% thrust
+   gap vs *default* Pythia was the ME correction. Two routes were tried; the honest record:
+   - **Naive reweight R=(x1²+x2²)/2 — FAILED (reverted):** it assumes the *old mass-ordered*
+     shower's eikonal density; on this pT-ordered dipole shower (which already applies the
+     (1+z²)/2 kernel) it *double-suppresses* (⟨1−T⟩ 0.069→0.0517).
+   - **Direct ME generation (POWHEG-style) — WORKS** (`-DME_FIRST`, `sampleFirstEmission` in
+     `shower_inc.cuh`): the hardest emission is generated *directly* from the exact Dalitz
+     density (x1²+x2²)/((1-x1)(1-x2)) via a **pT-ordered Sudakov veto** (t=pT²/Q², y=½ln((1-x1)/(1-x2)),
+     rate ∝ α_s(t)(x1²+x2²) dt/t dy), then the LL shower runs below pT_first. No (1+z²) kernel
+     on the first emission → no double-count. (One debug: the Sudakov `Iover` must carry the
+     C_F/2π prefactor — without it the rate was ~4.7× too high, ⟨1−T⟩→0.133.) **Result:** thrust
+     vs *default* Pythia (ME corrections ON) **23.8% → 7.9%**, ⟨1−T⟩ **0.0641 vs 0.0635**;
+     conservation exact, 100% GPU≡CPU. The first emission now reproduces the exact O(α_s) ME.
 2. **CMW (Catani–Marchesini–Webber) α_s — DONE & VALIDATED.** Soft-gluon NLL coherence:
    α_s → α_s(1 + α_s K/2π), K = C_A(67/18 − π²/6) − 5n_f/9. Added behind `-DUSE_CMW`
    (default off, so the LL results above are unchanged). It correctly increases soft

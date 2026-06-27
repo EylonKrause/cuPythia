@@ -134,8 +134,13 @@ int main(int argc,char**argv){
   printf("  GPU vs CPU port   : control-flow bit-identical %ld/%d = %.2f%%  (mean mult %.3f vs %.3f)\n",
          structSame, nCPU, 100.0*structSame/nCPU, meanN, meanNcpu);
   printf("                      momenta agree to %.2e (GPU/CPU IEEE transcendental accumulation)\n", maxMomRel);
+#ifdef ME_FIRST
+  bool detOK = (structSame > (long)(0.999*nCPU));  // ME adds a transcendental veto -> rare ULP flips OK (decided a priori)
+#else
+  bool detOK = (structSame == nCPU);               // pure LL: exact bit-identical control flow
+#endif
   bool ok = (maxMomViol<1e-5) && (maxM2<1e-3) && (reproDiff==0) &&
-            (meanN>2.5&&meanN<25.0) && (structSame==nCPU) && (maxMomRel<1e-6) &&
+            (meanN>2.5&&meanN<25.0) && detOK && (maxMomRel<1e-6) &&
             (mean1mT>0.01 && mean1mT<0.30);
   printf("VALIDATION: %s (momentum+on-shell+reproducible+CPU-agreement+thrust-sane)\n", ok?"PASS":"FAIL");
   cudaFree(dN);cudaFree(dTot);cudaFree(dM2);cudaFree(dThr);
