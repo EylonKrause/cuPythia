@@ -25,9 +25,10 @@ STAMP="$PIPE/.cupythia_build"
 say(){ printf '\033[1;36m[cuPythia]\033[0m %s\n' "$*" >&2; }
 die(){ printf '\033[1;31m[cuPythia] %s\033[0m\n' "$*" >&2; exit 1; }
 
-FORCE=0; ARCH_OVR=""; CUDA_OVR=""; GPUS_OVR=""; SINGLE=0
+FORCE=0; ARCH_OVR=""; CUDA_OVR=""; GPUS_OVR=""; SINGLE=0; BUILD_ONLY=0
 while [ $# -gt 0 ]; do case "$1" in
-  --rebuild)  FORCE=1; shift;;
+  --rebuild)    FORCE=1; shift;;
+  --build-only) BUILD_ONLY=1; shift;;   # build for this host's GPU(s) and exit (used by cluster.sh over SSH)
   --arch)     [ $# -ge 2 ] || die "--arch needs a value, e.g. --arch sm_61"; ARCH_OVR="${2#sm_}"; shift 2;;
   --cuda)     [ $# -ge 2 ] || die "--cuda needs a path, e.g. --cuda /usr/local/cuda-12.9"; CUDA_OVR="$2"; shift 2;;
   --gpus)     [ $# -ge 2 ] || die "--gpus needs a list, e.g. --gpus 0,1"; GPUS_OVR="$2"; shift 2;;
@@ -119,6 +120,7 @@ fi
 say "make $TARGET"
 make -C "$PIPE" "${BUILDFLAG[@]}" NVCC="$NVCC" "$TARGET" || die "build failed for '$TARGET'"
 printf '%s' "$KEY" > "$STAMP"
+[ "$BUILD_ONLY" = 1 ] && { say "built $TARGET ($(echo $DISTINCT | sed 's/\([0-9]*\)/sm_\1/g'))"; exit 0; }
 
 # ---- make-only targets: nothing to run ----
 case "$TARGET" in check|checkhf|all|clean) say "done ($TARGET)"; exit 0;; esac

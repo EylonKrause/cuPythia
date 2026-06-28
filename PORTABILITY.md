@@ -56,7 +56,9 @@ fatbinary; the per-GPU dumps are merged. Because the slices are structurally dis
 **the merged result is bit-identical to one GPU running all N events** — verified: a 2-shard merged
 `hadronize_mr` dump is **byte-for-byte identical (same sha256)** to the single-GPU run of all N events.
 With no `CUPYTHIA_SHARD` set the offset is 0 → single-GPU runs stay byte-identical. `--gpus 0,2` picks
-devices; `--single` forces one.
+devices; `--single` forces one. To pool GPUs across **multiple machines on a LAN** (any mix of
+architectures), `cluster.sh` does the same global-index sharding over SSH and merges the per-host
+dumps — see [`CLUSTER.md`](CLUSTER.md).
 
 **Pipeline** (`cuPythia/pipeline/`, GNU make):
 ```

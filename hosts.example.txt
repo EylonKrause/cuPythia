@@ -1,0 +1,13 @@
+# cuPythia cluster hostfile — list one worker GPU machine per line, then run e.g.:
+#   ./cluster.sh hosts.example.txt hadronize_mr_hf 1000000 events.dat
+#
+# Columns:  <ssh-target>     <cuPythia-dir-on-that-host>     [gpu-count]
+#   - "localhost" runs locally (no SSH).
+#   - remote hosts need passwordless SSH (key auth) + cuPythia checked out + a CUDA toolkit.
+#   - the optional 3rd column forces a GPU count (otherwise it is queried via nvidia-smi).
+# Any mix of architectures works (e.g. a 5050 + a Jetson, a 4090 + an A100) — each host builds for its own.
+
+localhost            /home/eylonk/cuPythia
+# user@4090-box      /home/user/cuPythia
+# nvidia@jetson      /home/nvidia/cuPythia       1
+# eylonk@a100-node   /opt/cuPythia

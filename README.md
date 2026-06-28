@@ -97,6 +97,11 @@ output is bit-identical to one giant single-GPU run — verified). **Different G
 an A100 (sm_80) + an RTX 4090 (sm_89) → one fatbinary covering both, each GPU runs its native code.
 `--gpus 0,2` selects specific devices; `--single` forces one.
 
+**Across machines on a LAN** — `cluster.sh` pools the GPUs of *several hosts* for one run (a 5050 laptop
++ a Jetson, a 4090 box + an A100 node, any mix): each host builds for its own arch, computes a disjoint
+slice, and the dumps are merged. List your machines in a hostfile and run one command:
+`./cluster.sh hosts.txt hadronize_mr_hf 1000000 events.dat` — see [`CLUSTER.md`](CLUSTER.md).
+
 Or build manually:
 ```bash
 cd pythia8317 && ./configure && make -j"$(nproc)"   # baseline library
