@@ -5,7 +5,15 @@
 #   cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 #   cmake --build build
 #
-# Override the GPU target with -DCMAKE_CUDA_ARCHITECTURES=90 (Hopper), 80, etc.
+# GPU architecture (portable: Pascal sm_60 through Blackwell sm_120):
+#   default              -> "native" (needs CMake >= 3.24 AND a GPU visible at configure time): auto-
+#                           detects this machine's GPU, so a Pascal box on CUDA <= 12.9 builds sm_60/61
+#                           with no extra flags. HEADLESS / CI / no-GPU build hosts MUST pass an explicit
+#                           -DCMAKE_CUDA_ARCHITECTURES (native cannot detect a GPU and will error).
+#   -DCMAKE_CUDA_ARCHITECTURES=60        Pascal P100 (or 61 for GTX 10-series)
+#   -DCMAKE_CUDA_ARCHITECTURES=all-major portable fatbinary, every major arch the TOOLKIT supports (CMake >= 3.23)
+#   -DCMAKE_CUDA_ARCHITECTURES="60;70;80;90;120"   explicit list (works on any CMake >= 3.18)
+# NOTE: CUDA 13.x removed Pascal/Volta; to target sm_60/61/70 use CUDA <= 12.9 (see PORTABILITY.md).
 cmake_minimum_required(VERSION 3.20)
 
 # VS 2022/2026 (MSVC 14.4x/14.5x) can be newer than the CUDA host-compiler
@@ -18,9 +26,13 @@ endif()
 project(cuPythia LANGUAGES CXX CUDA)
 
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-  set(CMAKE_CUDA_ARCHITECTURES 120)   # Blackwell / RTX 5050 by default
+  if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.24)
+    set(CMAKE_CUDA_ARCHITECTURES native)  # auto-detect the local GPU (Pascal..Blackwell)
+  else()
+    set(CMAKE_CUDA_ARCHITECTURES 120)     # CMake < 3.24 has no "native": pick your arch with -D
+  endif()
 endif()
-set(CMAKE_CXX_STANDARD 17)    # CUB (kernel 10) requires C++17
+set(CMAKE_CXX_STANDARD 17)    # CUB (kernel 10) requires C++17 -> CUDA toolkit >= 11.0
 set(CMAKE_CUDA_STANDARD 17)
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)

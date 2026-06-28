@@ -85,3 +85,10 @@ cd pythia8317 && ./configure && make -j"$(nproc)"   # baseline library
 cd ../cuPythia && make check                         # build + validate all kernels
 cd ../cuPythia && make mpi                            # optional: multi-node build (needs mpicxx)
 ```
+
+**GPU support: Pascal (2016) → Blackwell (2025).** The kernels use only plain FP64/integer math (no
+arch-specific intrinsics), so they run on any NVIDIA GPU from `sm_60` up. Build for an older GPU with
+`make ARCH=sm_60` (pipeline) or `-DCMAKE_CUDA_ARCHITECTURES=60` (CMake / `build.ps1 -Arch 61`), or a
+portable multi-arch fatbinary with `make SMS="60 61 70 75 80 86 89 90 120"`. **Targeting Pascal/Volta
+needs CUDA ≤ 12.9** (CUDA 13 removed them); requires CUDA ≥ 11.0 (C++17). Full matrix + caveats in
+[`PORTABILITY.md`](PORTABILITY.md).

@@ -17,8 +17,8 @@
 #define CK(c) do{cudaError_t e_=(c); if(e_!=cudaSuccess){printf("CUDA %s @%d\n",cudaGetErrorString(e_),__LINE__);return 1;}}while(0)
 
 // ---- flavour layer copied from hadronize_mr.cu (params + meson combine + baryon mechanism) ----
-static const double H_PROBSTOUD=0.217, H_MUDV=0.50, H_SV=0.55, H_THPS=-15.0, H_THV=36.0;
-static const double H_ETASUP=0.60, H_ETAPSUP=0.12;
+static constexpr double H_PROBSTOUD=0.217, H_MUDV=0.50, H_SV=0.55, H_THPS=-15.0, H_THV=36.0;
+static constexpr double H_ETASUP=0.60, H_ETAPSUP=0.12;
 __host__ __device__ inline int pickFlavMR(uint64_t& c){ double r=u01(splitmix64(c++))*(2.0+H_PROBSTOUD); return (r<1.0)?1:((r<2.0)?2:3); }
 __host__ __device__ inline int combineMesonMR(int id1,int id2,uint64_t& c){
   int a1=abs(id1),a2=abs(id2),idMax=(a1>a2)?a1:a2,idMin=(a1<a2)?a1:a2;
@@ -32,7 +32,7 @@ __host__ __device__ inline int combineMesonMR(int id1,int id2,uint64_t& c){
     if(idM==221&&H_ETASUP<u01(splitmix64(c++)))return 0; if(idM==331&&H_ETAPSUP<u01(splitmix64(c++)))return 0; }
   return idM;
 }
-static const double H_PROBQQTOQ=0.081, H_PROBSQTOQQ=0.915, H_PROBQQ1TOQQ0=0.0275, H_DECUPLETSUP=1.0;
+static constexpr double H_PROBQQTOQ=0.081, H_PROBSQTOQQ=0.915, H_PROBQQ1TOQQ0=0.0275, H_DECUPLETSUP=1.0;
 __host__ __device__ inline double bCGoct(int i){ const double v[6]={0.75,0.5,0.0,0.1667,0.0833,0.1667}; return v[i]; }
 __host__ __device__ inline double bCGdec(int i){ const double v[6]={0.0,0.0,1.0,0.3333,0.6667,0.3333}; return v[i]; }
 __host__ __device__ inline double bCGsum(int i){ return bCGoct(i)+H_DECUPLETSUP*bCGdec(i); }

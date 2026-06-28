@@ -8,6 +8,21 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+// Portability: hardware double-precision atomicAdd is native on Pascal (sm_60) and up — which is
+// cuPythia's minimum target. This CAS fallback is compiled ONLY for older arches (Maxwell sm_50,
+// Kepler sm_3x), so the generator also builds for pre-Pascal GPUs without touching the sm_60+ path
+// (where the native instruction is used). No effect on host or on sm_60+ device code.
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600
+__device__ inline double atomicAdd(double* address, double val) {
+  unsigned long long int* a = (unsigned long long int*)address;
+  unsigned long long int old = *a, assumed;
+  do { assumed = old;
+    old = atomicCAS(a, assumed, __double_as_longlong(val + __longlong_as_double(assumed)));
+  } while (assumed != old);              // NaN-aware: loops until the CAS sticks
+  return __longlong_as_double(old);
+}
+#endif
+
 // Host/device-identical SplitMix64 counter-based RNG (no cuRAND dependency).
 // Counter-based so each GPU thread derives an independent stream from (seed,tid)
 // with no per-thread state to store, and CPU/GPU produce bit-identical draws —

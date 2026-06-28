@@ -7,10 +7,10 @@
 #include <cstdint>
 #include "../common/rng.cuh"
 
-static const double MZ     = 91.1876;       // Z mass / CM energy
-static const double EBEAM  = 0.5*MZ;        // each initial quark energy
-static const double PT2MIN = 0.5*0.5;       // (TimeShower:pTmin = 0.5 GeV)^2 cutoff
-static const double ASMZ   = 0.1365;        // alpha_s(M_Z)
+static constexpr double MZ     = 91.1876;       // Z mass / CM energy
+static constexpr double EBEAM  = 0.5*MZ;        // each initial quark energy
+static constexpr double PT2MIN = 0.5*0.5;       // (TimeShower:pTmin = 0.5 GeV)^2 cutoff
+static constexpr double ASMZ   = 0.1365;        // alpha_s(M_Z)
 #define MAXP 64
 #ifdef G2QQ_WEIGHT4
 #define G2Q4_OVER 4.0   // veto oversample for the option-4 g->qqbar weight (zCosThe makes it >1 in places)

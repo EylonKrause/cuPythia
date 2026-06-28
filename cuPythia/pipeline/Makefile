@@ -1,8 +1,25 @@
 # cuPythia device-resident generator pipeline (separate from the demo kernels 00-14).
 # Each stage reads/writes the SoA event record (event.cuh) on the device.
 NVCC      ?= /usr/local/cuda/bin/nvcc
+# --- GPU architecture (portable: Pascal sm_60 through Blackwell sm_120) -------------------------
+# Default = one arch, fast. Target a different GPU:                 make ARCH=sm_60   (Pascal P100)
+#                                                                   make ARCH=sm_61   (GTX 10-series)
+# Portable multi-arch fatbinary (one binary runs on many GPUs; embeds PTX of the highest for
+# forward JIT on future GPUs):     make SMS="60 61 70 75 80 86 89 90 120"   (any order is fine)
+# IMPORTANT: CUDA 13.x REMOVED Pascal/Volta -- to emit sm_60/61/70 you need CUDA <= 12.9 (the last
+# 12.x). The code itself is portable to sm_60 (plain FP64/int, no arch intrinsics); see PORTABILITY.md.
+# NB the heavy hadronize_mr_baryon/max/hf targets are SINGLE-arch only (use ARCH=, not SMS=) -- a
+# multi-arch fatbinary of that monster kernel would exhaust the compiler (see the __noinline__ note).
 ARCH      ?= sm_120
-NVCCFLAGS ?= -O3 -std=c++17 -arch=$(ARCH)
+SMS       ?=
+ifeq ($(strip $(SMS)),)
+  GENCODE := -arch=$(ARCH)
+else
+  # numeric-max arch via `sort -n` so SMS order does NOT matter (its PTX is embedded for forward JIT)
+  SMS_HI  := $(shell echo $(SMS) | tr ' ' '\n' | sort -n | tail -1)
+  GENCODE := $(foreach s,$(SMS),-gencode arch=compute_$(s),code=sm_$(s)) -gencode arch=compute_$(SMS_HI),code=compute_$(SMS_HI)
+endif
+NVCCFLAGS ?= -O3 -std=c++17 $(GENCODE)
 
 STAGES = build_events reweight generate pdf_xsec pdf_lumi_fft shower_fsr zlund_test hadronize lhe_writer bridge region_test hadronize_mr decay_test baryon_test dalitz_test
 

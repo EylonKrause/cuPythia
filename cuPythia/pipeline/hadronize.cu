@@ -31,13 +31,13 @@
 // ---- Pythia 8.317 defaults ----
 __device__ __host__ inline double ALUND(){return 0.68;}
 __device__ __host__ inline double BLUND(){return 0.98;}
-static const double SIGMAQ   = 0.335/1.4142135623730951;  // sigma/sqrt2
-static const double PROBSTOUD= 0.217;
-static const double MESONUDV = 0.50,  MESONSV = 0.55;
-static const double THETAPS  = -15.0, THETAV  = 36.0;
-static const double ETASUP   = 0.60,  ETAPRIMESUP = 0.12;
-static const double STOPMASS = 0.8,   STOPNEWFLAV = 2.0, STOPSMEAR = 0.2;
-static const double ENHFRAC  = 0.01,  ENHWIDTH = 2.0;
+static constexpr double SIGMAQ   = 0.335/1.4142135623730951;  // sigma/sqrt2
+static constexpr double PROBSTOUD= 0.217;
+static constexpr double MESONUDV = 0.50,  MESONSV = 0.55;
+static constexpr double THETAPS  = -15.0, THETAV  = 36.0;
+static constexpr double ETASUP   = 0.60,  ETAPRIMESUP = 0.12;
+static constexpr double STOPMASS = 0.8,   STOPNEWFLAV = 2.0, STOPSMEAR = 0.2;
+static constexpr double ENHFRAC  = 0.01,  ENHWIDTH = 2.0;
 
 #include "zlund_inc.cuh"   // zLundMax + zLundSample (shared with zlund_test)
 

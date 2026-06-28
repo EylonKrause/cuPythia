@@ -35,12 +35,12 @@
 #define CK(c) do{cudaError_t e=(c); if(e!=cudaSuccess){printf("CUDA %s @%d\n",cudaGetErrorString(e),__LINE__);return 1;}}while(0)
 
 // ---- fragmentation parameters (Pythia 8.317 defaults; same as hadronize.cu) ----
-static const double H_ALUND=0.68, H_BLUND=0.98;
-static const double H_SIGMAQ=0.335/1.4142135623730951, H_PROBSTOUD=0.217;
-static const double H_MUDV=0.50, H_SV=0.55, H_CV=0.88, H_BV=2.20, H_THPS=-15.0, H_THV=36.0;  // V/PS suppression per flavour (Pythia StringFlav:meson{UD,S,C,B}vector)
-static const double H_ETASUP=0.60, H_ETAPSUP=0.12;
-static const double H_STOPM=0.8, H_STOPNF=2.0, H_STOPSM=0.2, H_ENHF=0.01, H_ENHW=2.0;
-static const double EQ_TINY=1e-6, PT2SAME=0.01;   // StringEnd::TINY, PT2SAME
+static constexpr double H_ALUND=0.68, H_BLUND=0.98;
+static constexpr double H_SIGMAQ=0.335/1.4142135623730951, H_PROBSTOUD=0.217;
+static constexpr double H_MUDV=0.50, H_SV=0.55, H_CV=0.88, H_BV=2.20, H_THPS=-15.0, H_THV=36.0;  // V/PS suppression per flavour (Pythia StringFlav:meson{UD,S,C,B}vector)
+static constexpr double H_ETASUP=0.60, H_ETAPSUP=0.12;
+static constexpr double H_STOPM=0.8, H_STOPNF=2.0, H_STOPSM=0.2, H_ENHF=0.01, H_ENHW=2.0;
+static constexpr double EQ_TINY=1e-6, PT2SAME=0.01;   // StringEnd::TINY, PT2SAME
 
 __host__ __device__ inline double mesonMassMR(int pdg){
   switch(abs(pdg)){
@@ -94,7 +94,7 @@ __host__ __device__ inline int combineMesonMR(int id1,int id2,uint64_t& c){
 // ---- Lund diquark/baryon production (first pass: spin-0+1 diquarks, octet+decuplet, uds, NO
 // popcorn; ported from Pythia 8.317 FragmentationFlavZpT.cc pick():201-291 + combineId:352-382).
 // Behind -DBARYONS. Counter-RNG, deterministic (host==device); flag-off path untouched. ----
-static const double H_PROBQQTOQ=0.081, H_PROBSQTOQQ=0.915, H_PROBQQ1TOQQ0=0.0275, H_DECUPLETSUP=1.0;
+static constexpr double H_PROBQQTOQ=0.081, H_PROBSQTOQQ=0.915, H_PROBQQ1TOQQ0=0.0275, H_DECUPLETSUP=1.0;
 // SU(6) Clebsch-Gordan (FragFlav:29-32) + the weighted sum/max, as accessors (no device-visible arrays).
 __host__ __device__ inline double bCGoct(int i){ const double v[6]={0.75,0.5,0.0,0.1667,0.0833,0.1667}; return v[i]; }
 __host__ __device__ inline double bCGdec(int i){ const double v[6]={0.0,0.0,1.0,0.3333,0.6667,0.3333}; return v[i]; }

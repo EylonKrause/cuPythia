@@ -20,7 +20,7 @@
 
 #define CK(c) do{cudaError_t e=(c); if(e!=cudaSuccess){printf("CUDA %s @%d\n",cudaGetErrorString(e),__LINE__);return 1;}}while(0)
 
-static const double ALUND=0.68, BLUND=0.98, CLUND=1.0;   // Pythia 8.317 StringZ defaults
+static constexpr double ALUND=0.68, BLUND=0.98, CLUND=1.0;   // Pythia 8.317 StringZ defaults
 
 __host__ __device__ inline double zLundMax(double a,double b,double c){
   const double AFROMZERO=0.02, AFROMC=0.01;
