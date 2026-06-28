@@ -1,4 +1,6 @@
 # Native Windows build of the cuPythia kernels (MSVC + CUDA + CMake).
+# Zero-config by default: auto-detects this machine's GPU (nvidia-smi) and picks a CUDA toolkit that
+# can compile for it (so a Pascal box with both CUDA 13 and 12.9 automatically uses 12.9).
 # Usage:  powershell -ExecutionPolicy Bypass -File build.ps1 [-Arch <archs>] [-CudaPath <dir>]
 #   -Arch     GPU architecture(s) for CMAKE_CUDA_ARCHITECTURES. Default "native" (auto-detect this
 #             machine's GPU, Pascal..Blackwell). Examples: 60 (Pascal P100), 61 (GTX 10xx),
@@ -21,14 +23,46 @@ $vcvars = Join-Path $vs "VC\Auxiliary\Build\vcvars64.bat"
 $cmake  = Join-Path $vs "Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
 if (-not (Test-Path $cmake)) { $cmake = "cmake" }   # fall back to a cmake on PATH
 
+# Auto-detect this machine's GPU arch (when -Arch is the default "native") so we can pick a CUDA
+# toolkit that can actually compile for it -- e.g. a Pascal box with both CUDA 13 and 12.9 picks 12.9.
+function Get-GpuArch {
+  $smi = (Get-Command nvidia-smi -ErrorAction SilentlyContinue).Source
+  if (-not $smi -and (Test-Path "C:\Windows\System32\nvidia-smi.exe")) { $smi = "C:\Windows\System32\nvidia-smi.exe" }
+  if (-not $smi) { return $null }
+  $cc = & $smi --query-gpu=compute_cap --format=csv,noheader 2>$null | Select-Object -First 1
+  if ($cc) { return ($cc -replace '[ .]','') }   # "12.0" -> "120"
+  return $null
+}
+$detected = if ($Arch -eq "native") { Get-GpuArch } else { $null }
+if ($detected) { Write-Host "Detected GPU -> sm_$detected" }
+
 if ($CudaPath) {
   $nvcc = Join-Path $CudaPath "bin\nvcc.exe"
   if (-not (Test-Path $nvcc)) { Write-Error "nvcc not found at $nvcc (check -CudaPath)."; exit 1 }
 } else {
   $cudaRoot = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA"
-  $cuda = Get-ChildItem $cudaRoot -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1
-  if (-not $cuda) { Write-Error "CUDA toolkit not found under $cudaRoot (use -CudaPath)."; exit 1 }
-  $nvcc = Join-Path $cuda.FullName "bin\nvcc.exe"
+  # VERSION-aware sort (newest first) -- a plain string sort puts v9.0 above v12.9.
+  $cudas = Get-ChildItem $cudaRoot -Directory -ErrorAction SilentlyContinue |
+    Sort-Object @{ Expression = { try { [version]($_.Name -replace '^[vV]','') } catch { [version]'0.0' } } } -Descending
+  if (-not $cudas) { Write-Error "CUDA toolkit not found under $cudaRoot (use -CudaPath)."; exit 1 }
+  if ($detected) {
+    # newest toolkit that can EMIT the detected arch (skips CUDA 13.x for Pascal/Volta)
+    $nvcc = $null
+    foreach ($c in $cudas) {
+      $n = Join-Path $c.FullName "bin\nvcc.exe"
+      if ((Test-Path $n) -and ((& $n --list-gpu-arch 2>$null) -contains "compute_$detected")) { $nvcc = $n; break }
+    }
+    if (-not $nvcc) {
+      $hint = if ("60","61","70" -contains $detected) { " Pascal/Volta need CUDA <= 12.9 (CUDA 13 removed them) -- install one or pass -CudaPath." } else { "" }
+      Write-Error "No installed CUDA toolkit can compile for sm_$detected.$hint See PORTABILITY.md."; exit 1
+    }
+    $Arch = $detected   # build for exactly the detected arch (consistent with the chosen toolkit)
+  } elseif ($Arch -eq "native") {
+    # no GPU detected and arch left at "native" -> CMake's native cannot resolve without a GPU
+    Write-Error "Could not detect a GPU (nvidia-smi). For a headless/CI build pass an explicit -Arch (e.g. -Arch 80, or -Arch all-major for a portable fatbinary). See PORTABILITY.md."; exit 1
+  } else {
+    $nvcc = Join-Path $cudas[0].FullName "bin\nvcc.exe"   # explicit -Arch given -> newest toolkit
+  }
 }
 
 Write-Host "VS:    $vs"

@@ -98,3 +98,4 @@ cuPythia/**/err*.log
 # Scratch / logs
 *.log
 *.tmp
+cuPythia/pipeline/.cupythia_build

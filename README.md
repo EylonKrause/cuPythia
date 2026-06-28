@@ -80,6 +80,18 @@ HEP_FEATURES.md  gap analysis vs community needs
 
 ## Build
 
+**Quick start — no CUDA knowledge required.** One command auto-detects your GPU's microarchitecture,
+picks a CUDA toolkit that can compile for it, builds the kernels once, and runs (later runs just run):
+
+```bash
+./run.sh                       # first run: detect GPU + build everything + validate
+./run.sh shower_fsr 200000     # build if needed, then run a stage with its args
+./run.sh hadronize_mr_hf 50000 # best-physics hadronizer (one-time heavier compile)
+```
+It prints e.g. `GPU -> sm_120`, `CUDA -> release 13.3`, builds, and runs — physicists never touch nvcc.
+On a Pascal/Volta box it auto-selects a CUDA ≤ 12.9 toolkit (and says so if none is installed).
+
+Or build manually:
 ```bash
 cd pythia8317 && ./configure && make -j"$(nproc)"   # baseline library
 cd ../cuPythia && make check                         # build + validate all kernels

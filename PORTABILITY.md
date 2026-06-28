@@ -37,6 +37,13 @@ event-compaction kernel needs it); this still covers all Pascal+ GPUs via CUDA 1
 
 ## Building for a specific / older GPU
 
+**Easiest — zero config (`./run.sh` at the repo root):** auto-detects your GPU's compute capability,
+picks the newest installed CUDA toolkit that can compile for it (so Pascal/Volta automatically use a
+CUDA ≤ 12.9 toolkit if present), builds for that arch once (cached), and runs — e.g. `./run.sh`,
+`./run.sh shower_fsr 200000`, `./run.sh --arch sm_61 ...`, `./run.sh --cuda /usr/local/cuda-12.9 ...`.
+On Windows, `cuPythia\build.ps1` does the same auto-detect + compatible-CUDA selection. The manual
+recipes below are for fine-grained control.
+
 **Pipeline** (`cuPythia/pipeline/`, GNU make):
 ```
 make ARCH=sm_60                 # Pascal P100   (needs CUDA <= 12.8)
