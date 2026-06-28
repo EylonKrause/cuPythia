@@ -421,14 +421,15 @@ __host__ __device__ __noinline__ int hadronizeMR(const double* P,const int* id,i
   return -1;
 }
 
-__global__ void kern(int N,uint64_t base,int* outN,int* outNc,double* outTot,double* outDm,int* outNp,
+__global__ void kern(int N,uint64_t base,uint64_t eoff,int* outN,int* outNc,double* outTot,double* outDm,int* outNp,
                      double* outH,int* outHid){
   int e=blockIdx.x*(int)blockDim.x+threadIdx.x; if(e>=N) return;
+  uint64_t eg=(uint64_t)e+eoff;   // GLOBAL event index (eoff!=0 only when multi-GPU sharded; else eg==e)
   double Psh[MAXP*4]; int idsh[MAXP];
-  int np=showerEvent(Psh,idsh, base+(uint64_t)e*0x9E3779B97F4A7C15ULL);   // FSR shower chain
+  int np=showerEvent(Psh,idsh, base+eg*0x9E3779B97F4A7C15ULL);   // FSR shower chain
   outNp[e]=np;
   double H[MAXPART*4]; int hid[MAXPART]; double hm[MAXPART];
-  uint64_t hctr=(base^0x5151ULL)+(uint64_t)e*0x100000001B3ULL;
+  uint64_t hctr=(base^0x5151ULL)+eg*0x100000001B3ULL;
 #ifdef GLUON_SPLIT
   // g->qqbar forks the colour chain into independent sub-strings: hadronize each with its own RNG
   // stream and concatenate. A non-forked event has ns==1 and uses hctr -> identical single-string
@@ -455,7 +456,7 @@ __global__ void kern(int N,uint64_t base,int* outN,int* outNc,double* outTot,dou
   // stable set. SEPARATE counter stream dctr (NOT hctr) so toggling -DDECAYS cannot perturb the
   // hadronization draws -> the no-decay build stays byte-identical.
   double F[MAXFINAL*4]; int fid[MAXFINAL];
-  uint64_t dctr=(base^0xDECAULL)+(uint64_t)e*0x100000001B3ULL;
+  uint64_t dctr=(base^0xDECAULL)+eg*0x100000001B3ULL;
   int nF=decayEvent(H,hid,nH,dctr,F,fid);
   if(nF<0){ outN[e]=-1; return; }
   double* OUTP=F; int* OUTID=fid; int OUTN=nF;
@@ -478,6 +479,7 @@ __global__ void kern(int N,uint64_t base,int* outN,int* outNc,double* outTot,dou
 
 int main(int argc,char**argv){
   int N=(argc>1)?atoi(argv[1]):20000; uint64_t base=0x4D52ULL;
+  uint64_t eoff=cupythia_shard_offset();   // multi-GPU: global event-index offset (0 unless sharded)
 #ifdef DECAYS
   int TPB=64;    // larger per-thread F[]/S[] under decays -> use fewer threads/block to fit
 #else
@@ -488,7 +490,7 @@ int main(int argc,char**argv){
   int *dN,*dNc,*dNp,*dHid; double *dTot,*dDm,*dH;
   CK(cudaMalloc(&dN,(size_t)N*4));CK(cudaMalloc(&dNc,(size_t)N*4));CK(cudaMalloc(&dNp,(size_t)N*4));CK(cudaMalloc(&dTot,(size_t)N*32));CK(cudaMalloc(&dDm,(size_t)N*8));
   CK(cudaMalloc(&dH,(size_t)N*OUTCAP*4*8));CK(cudaMalloc(&dHid,(size_t)N*OUTCAP*4));
-  kern<<<blocks,TPB>>>(N,base,dN,dNc,dTot,dDm,dNp,dH,dHid); CK(cudaDeviceSynchronize());
+  kern<<<blocks,TPB>>>(N,base,eoff,dN,dNc,dTot,dDm,dNp,dH,dHid); CK(cudaDeviceSynchronize());
   std::vector<int> hN(N),hNc(N),hNp(N); std::vector<double> hTot((size_t)N*4),hDm(N);
   CK(cudaMemcpy(hN.data(),dN,(size_t)N*4,cudaMemcpyDeviceToHost));
   CK(cudaMemcpy(hNc.data(),dNc,(size_t)N*4,cudaMemcpyDeviceToHost));
@@ -499,7 +501,7 @@ int main(int argc,char**argv){
   if(dumpFile){ hH.resize((size_t)N*OUTCAP*4); hHid.resize((size_t)N*OUTCAP);
     CK(cudaMemcpy(hH.data(),dH,(size_t)N*OUTCAP*4*8,cudaMemcpyDeviceToHost));
     CK(cudaMemcpy(hHid.data(),dHid,(size_t)N*OUTCAP*4,cudaMemcpyDeviceToHost)); }
-  std::vector<int> hN2(N); kern<<<blocks,TPB>>>(N,base,dN,dNc,dTot,dDm,dNp,dH,dHid); CK(cudaDeviceSynchronize());
+  std::vector<int> hN2(N); kern<<<blocks,TPB>>>(N,base,eoff,dN,dNc,dTot,dDm,dNp,dH,dHid); CK(cudaDeviceSynchronize());
   CK(cudaMemcpy(hN2.data(),dN,(size_t)N*4,cudaMemcpyDeviceToHost));
   if(dumpFile){ FILE* fo=fopen(dumpFile,"w");
     if(fo){ long nValid=0; for(int e=0;e<N;++e) if(hN[e]>0) nValid++;

@@ -84,12 +84,18 @@ HEP_FEATURES.md  gap analysis vs community needs
 picks a CUDA toolkit that can compile for it, builds the kernels once, and runs (later runs just run):
 
 ```bash
-./run.sh                       # first run: detect GPU + build everything + validate
-./run.sh shower_fsr 200000     # build if needed, then run a stage with its args
-./run.sh hadronize_mr_hf 50000 # best-physics hadronizer (one-time heavier compile)
+./run.sh                              # first run: detect GPU(s) + build everything + validate
+./run.sh shower_fsr 200000            # build if needed, then run a stage with its args
+./run.sh hadronize_mr_hf 1000000 events.dat   # generate 1e6 events ACROSS ALL GPUs -> events.dat
 ```
-It prints e.g. `GPU -> sm_120`, `CUDA -> release 13.3`, builds, and runs — physicists never touch nvcc.
+It prints e.g. `GPUs: 1 -> sm_120`, `CUDA -> release 13.3`, builds, and runs — physicists never touch nvcc.
 On a Pascal/Volta box it auto-selects a CUDA ≤ 12.9 toolkit (and says so if none is installed).
+
+**Multi-GPU & mixed architectures — automatic.** If the machine has several GPUs, a generation run is
+sharded across all of them (each gets a disjoint slice of the counter-RNG event stream, so the merged
+output is bit-identical to one giant single-GPU run — verified). **Different GPUs work together**: e.g.
+an A100 (sm_80) + an RTX 4090 (sm_89) → one fatbinary covering both, each GPU runs its native code.
+`--gpus 0,2` selects specific devices; `--single` forces one.
 
 Or build manually:
 ```bash

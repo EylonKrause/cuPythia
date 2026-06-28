@@ -44,6 +44,20 @@ CUDA ≤ 12.9 toolkit if present), builds for that arch once (cached), and runs 
 On Windows, `cuPythia\build.ps1` does the same auto-detect + compatible-CUDA selection. The manual
 recipes below are for fine-grained control.
 
+**Multi-GPU & mixed-architecture clusters (automatic).** `run.sh` enumerates *every* GPU. If they have
+**different** microarchitectures it builds **one fatbinary covering all of them** (e.g. an A100 sm_80 +
+an RTX 4090 sm_89 → `SMS="80 89"`), and picks a CUDA toolkit that can emit them all (erroring with
+guidance if none can — e.g. a Pascal+Blackwell mix needs a toolkit supporting both). A **generation run
+with an output file is sharded across all GPUs**: each GPU gets a disjoint slice of the counter-RNG
+event stream: the kernel adds an **event-index offset** `shard·M` to its local index `e`
+(`CUPYTHIA_SHARD`/`CUPYTHIA_SHARD_N`), so shard *i* computes exactly global events `[i·M, i·M+cnt)` and
+every seed is a pure function of the *global* index. Each GPU runs its own native SASS from the
+fatbinary; the per-GPU dumps are merged. Because the slices are structurally disjoint and contiguous,
+**the merged result is bit-identical to one GPU running all N events** — verified: a 2-shard merged
+`hadronize_mr` dump is **byte-for-byte identical (same sha256)** to the single-GPU run of all N events.
+With no `CUPYTHIA_SHARD` set the offset is 0 → single-GPU runs stay byte-identical. `--gpus 0,2` picks
+devices; `--single` forces one.
+
 **Pipeline** (`cuPythia/pipeline/`, GNU make):
 ```
 make ARCH=sm_60                 # Pascal P100   (needs CUDA <= 12.8)
