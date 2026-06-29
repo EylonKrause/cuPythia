@@ -1,0 +1,27 @@
+# cuPythia Apptainer / Singularity definition (the HPC container format).
+#
+#   apptainer build cupythia.sif packaging/cupythia.def
+#   apptainer run --nv cupythia.sif cupythia-hadronize_mr 100000 events.dat
+#
+# Use a CUDA <= 12.9 devel base if you include Volta sm_70 in SMS (CUDA 13 dropped Pascal/Volta).
+Bootstrap: docker
+From: nvidia/cuda:12.9.1-devel-ubuntu22.04
+
+%files
+    . /opt/cuPythia
+
+%post
+    apt-get update && apt-get install -y --no-install-recommends build-essential make ca-certificates
+    rm -rf /var/lib/apt/lists/*
+    cd /opt/cuPythia/cuPythia/pipeline
+    make SMS="75 80 86 89 90 120" shower_fsr hadronize_mr build_events
+    make install PREFIX=/usr/local
+
+%runscript
+    exec "$@"
+
+%help
+    cuPythia — GPU (CUDA) reimplementation of parts of PYTHIA 8 (GPL-2; not the official PYTHIA).
+    Run a generator, e.g.:  apptainer run --nv cupythia.sif cupythia-hadronize_mr 100000 events.dat
+    Build the full-physics hadronize_mr_hf for your GPU inside the container with:
+       make ARCH=sm_<cc> hadronize_mr_hf   (in /opt/cuPythia/cuPythia/pipeline)

@@ -1,0 +1,22 @@
+# cuPythia container (Docker / Podman). Builds a multi-arch fatbinary inside a CUDA devel image so the
+# resulting image runs on any GPU in the chosen range, with the generators on PATH as `cupythia-*`.
+#
+#   docker build -t cupythia -f packaging/Containerfile .
+#   docker run --gpus all -v "$PWD":/work cupythia cupythia-hadronize_mr 100000 /work/events.dat
+#
+# CUDA_TAG picks the toolkit (use a <=12.9 devel tag if you include Volta sm_70 in SMS; CUDA 13 dropped
+# Pascal/Volta). SMS is the fatbinary arch set. The heavy full-physics hadronize_mr_hf is NOT prebuilt
+# (a multi-arch build of it is very slow); build it inside for your GPU:  make ARCH=sm_<cc> hadronize_mr_hf
+ARG CUDA_TAG=12.9.1-devel-ubuntu22.04
+FROM nvidia/cuda:${CUDA_TAG}
+
+ARG SMS="75 80 86 89 90 120"
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential make ca-certificates && rm -rf /var/lib/apt/lists/*
+
+COPY . /opt/cuPythia
+WORKDIR /opt/cuPythia/cuPythia/pipeline
+RUN make SMS="${SMS}" shower_fsr hadronize_mr build_events && make install PREFIX=/usr/local
+
+WORKDIR /work
+CMD ["cupythia-hadronize_mr", "100000", "/work/events.dat"]

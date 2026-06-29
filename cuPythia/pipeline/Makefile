@@ -185,4 +185,19 @@ clean:
 	rm -f $(STAGES) hepmc3_writer decay_test_hf dalitz_test_flat dalitz_test_me \
 	      hadronize_mr_full hadronize_mr_max hadronize_mr_hf hadronize_mr_baryon hadronize_mr_zf hadronize_mr_zfhf
 
-.PHONY: all check checkhf clean
+# Install the already-built pipeline binaries + the orchestration scripts into a prefix, so a cluster can
+# expose cuPythia as an environment module (e.g. `make ARCH=sm_80 hadronize_mr_hf && make install
+# PREFIX=/opt/cupythia`). Binaries are namespaced `cupythia-<stage>` to avoid PATH collisions; run.sh ->
+# `cupythia`, cluster.sh -> `cupythia-cluster`. Only installs targets that have actually been built.
+PREFIX ?= /usr/local
+BINDIR  = $(DESTDIR)$(PREFIX)/bin
+REPO    = $(abspath ../..)
+install:
+	@mkdir -p "$(BINDIR)"
+	@n=0; for f in $(STAGES) hadronize_mr_hf hadronize_mr_max hadronize_mr_full hadronize_mr_bw hadronize_mr_decay; do \
+	   if [ -x "$$f" ]; then install -m755 "$$f" "$(BINDIR)/cupythia-$$f"; n=$$((n+1)); fi; done; \
+	 [ -f "$(REPO)/run.sh" ]     && install -m755 "$(REPO)/run.sh"     "$(BINDIR)/cupythia"         || true; \
+	 [ -f "$(REPO)/cluster.sh" ] && install -m755 "$(REPO)/cluster.sh" "$(BINDIR)/cupythia-cluster" || true; \
+	 echo "installed $$n binary(ies) + scripts to $(BINDIR)  (add it to PATH / a module)"
+
+.PHONY: all check checkhf clean install

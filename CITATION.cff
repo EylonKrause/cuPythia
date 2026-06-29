@@ -1,0 +1,45 @@
+cff-version: 1.2.0
+title: "cuPythia: a GPU (CUDA) reimplementation of PYTHIA 8 event generation"
+message: "If you use cuPythia, please cite this software and PYTHIA 8.3 (see references)."
+type: software
+authors:
+  - family-names: Krause
+    given-names: Eylon
+    email: eylonk@advstg.com
+repository-code: "https://github.com/EylonKrause/cuPythia"
+url: "https://github.com/EylonKrause/cuPythia"
+abstract: >-
+  cuPythia is an independent, from-scratch GPU (CUDA) reimplementation of parts of the
+  PYTHIA 8 event generator: the LO hard process, the final-state (FSR) dipole parton shower,
+  Lund string fragmentation (single- and multi-region), hadron decays, and supporting
+  machinery. Events are generated device-resident, one event per thread, with a counter-based
+  (SplitMix64) RNG that makes every event O(1)-reproducible and host/device bit-identical, and
+  N-weight scale-variation reweighting bit-identical to N pinned re-runs. Optional, opt-in
+  precision corrections (first-emission matrix element, CMW and 2-loop alpha_s, g->qqbar
+  splitting, Breit-Wigner masses, baryons, Z-flavour initialisation, D/B decays, Dalitz
+  matrix-element shapes) are validated against PYTHIA and against real ALEPH LEP1 data via Rivet.
+  cuPythia builds for NVIDIA GPUs from Pascal (sm_60) through Blackwell (sm_120), auto-detects
+  the GPU and a compatible CUDA toolkit, and pools GPUs across multiple GPUs and multiple LAN
+  hosts (any mix of architectures) for a single run.
+keywords:
+  - high-energy physics
+  - Monte Carlo event generator
+  - PYTHIA
+  - parton shower
+  - Lund string fragmentation
+  - GPU
+  - CUDA
+  - reproducibility
+license: GPL-2.0-only
+version: 0.1.0
+references:
+  - type: article
+    title: "A comprehensive guide to the physics and usage of PYTHIA 8.3"
+    authors:
+      - family-names: Bierlich
+        given-names: Christian
+      - name: "et al."
+    journal: "SciPost Phys. Codebases"
+    volume: "8"
+    year: 2022
+    notes: "arXiv:2203.11601 — the upstream PYTHIA 8.3 that cuPythia ports/derives."

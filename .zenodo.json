@@ -1,0 +1,24 @@
+{
+  "title": "cuPythia: a GPU (CUDA) reimplementation of PYTHIA 8 event generation",
+  "description": "<p>cuPythia is an independent, from-scratch GPU (CUDA) reimplementation of parts of the PYTHIA 8 event generator: the LO hard process, the final-state dipole parton shower, Lund string fragmentation (single- and multi-region), hadron decays, and supporting machinery. Events are generated device-resident, one event per thread, with a counter-based RNG that is host/device bit-identical and O(1)-reproducible. Optional opt-in precision corrections (first-emission ME, CMW/2-loop alpha_s, g-&gt;qqbar splitting, Breit-Wigner masses, baryons, Z-flavour init, D/B decays, Dalitz ME shapes) are validated against PYTHIA and against real ALEPH LEP1 data via Rivet. Builds for NVIDIA Pascal (sm_60) through Blackwell (sm_120), auto-detects GPU + a compatible CUDA toolkit, and pools GPUs across multiple devices and multiple LAN hosts (any mix of architectures) for one run.</p><p><strong>Not the official PYTHIA</strong>, not affiliated with the PYTHIA Collaboration; a research/proof-of-concept GPU port derived from PYTHIA 8.317 (GPL-2). Please also cite PYTHIA 8.3 (arXiv:2203.11601).</p>",
+  "license": "GPL-2.0-only",
+  "upload_type": "software",
+  "access_right": "open",
+  "creators": [
+    { "name": "Krause, Eylon" }
+  ],
+  "keywords": [
+    "high-energy physics",
+    "Monte Carlo event generator",
+    "PYTHIA",
+    "parton shower",
+    "Lund string fragmentation",
+    "GPU",
+    "CUDA",
+    "reproducibility"
+  ],
+  "related_identifiers": [
+    { "relation": "isDerivedFrom", "identifier": "arXiv:2203.11601", "scheme": "arxiv" },
+    { "relation": "isSupplementTo", "identifier": "https://github.com/EylonKrause/cuPythia", "scheme": "url" }
+  ]
+}

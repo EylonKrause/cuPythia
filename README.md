@@ -115,3 +115,25 @@ arch-specific intrinsics), so they run on any NVIDIA GPU from `sm_60` up. Build 
 portable multi-arch fatbinary with `make SMS="60 61 70 75 80 86 89 90 120"`. **Targeting Pascal/Volta
 needs CUDA ≤ 12.9** (CUDA 13 removed them); requires CUDA ≥ 11.0 (C++17). Full matrix + caveats in
 [`PORTABILITY.md`](PORTABILITY.md).
+
+## Install on a cluster
+
+`make install PREFIX=/opt/cupythia` (module-friendly), a **Spack** package (`packaging/spack/`), and
+**container** recipes (`packaging/Containerfile`, `packaging/cupythia.def` for Apptainer/Singularity)
+are provided. See [`INSTALL.md`](INSTALL.md).
+
+## Status, license & citing
+
+cuPythia is an **independent, from-scratch GPU reimplementation** of parts of Pythia 8 — a
+research / proof-of-concept port, **not the official Pythia and not affiliated with the Pythia
+Collaboration**. For physics-grade production, use the [official Pythia](https://pythia.org).
+
+Because it ports/derives Pythia 8.317 (GPL-2), cuPythia is released under the **GNU GPL v2**
+([`LICENSE`](LICENSE), [`NOTICE`](NOTICE)). If you use it, please cite this software
+([`CITATION.cff`](CITATION.cff)) **and** Pythia 8.3 — C. Bierlich *et al.*, *SciPost Phys.
+Codebases* **8** (2022), [arXiv:2203.11601](https://arxiv.org/abs/2203.11601).
+
+**Validated, honest results:** charged multiplicity 18.99 and ALEPH thrust χ²/ndf 5.22 vs real LEP1
+data (Rivet); exact per-event 4-momentum/charge/baryon-number conservation; bit-identical host↔device
+RNG and N-weight reweighting; Pascal→Blackwell + multi-GPU + multi-host. Scope and every approximation
+are documented in [`PRECISION.md`](cuPythia/pipeline/PRECISION.md) and [`RIVET.md`](cuPythia/pipeline/RIVET.md).

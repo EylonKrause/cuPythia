@@ -1,0 +1,33 @@
+cuPythia
+========
+
+cuPythia is an independent, from-scratch GPU (CUDA) reimplementation of parts of the
+PYTHIA 8 event generator — the hard process, the final-state parton shower, Lund string
+fragmentation, hadron decays, and supporting machinery — written to run device-resident,
+one-event-per-thread, with a counter-based RNG for exact reproducibility.
+
+Relationship to PYTHIA 8 and licensing
+--------------------------------------
+cuPythia's algorithms are ported from / derived from PYTHIA 8.317, which is licensed under
+the GNU General Public License v2 (see pythia8317/COPYING). As a derivative work, cuPythia
+is therefore also distributed under the GNU General Public License v2 (see LICENSE). A copy
+of PYTHIA 8.317 is vendored in pythia8317/ for building and validation; its copyright and
+license are retained by its authors.
+
+cuPythia is NOT the official PYTHIA, is NOT affiliated with or endorsed by the PYTHIA
+Collaboration or the Monte Carlo generators community, and must not be presented as such.
+It is a research / proof-of-concept GPU port. For physics-grade production work, use the
+official PYTHIA (https://pythia.org).
+
+Please cite PYTHIA 8.3 when using cuPythia:
+  C. Bierlich et al., "A comprehensive guide to the physics and usage of PYTHIA 8.3",
+  SciPost Phys. Codebases 8 (2022), arXiv:2203.11601.
+and cuPythia itself (see CITATION.cff).
+
+Copyright (C) 2026 Eylon Krause.
+Portions derived from PYTHIA 8.317, Copyright (C) the PYTHIA authors.
+
+This program is free software; you can redistribute it and/or modify it under the terms of
+the GNU General Public License v2 as published by the Free Software Foundation. This program
+is distributed WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. See the LICENSE file for details.
